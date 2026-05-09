@@ -1,7 +1,7 @@
 // HTTP request handlers for handy-cli
 
 use crate::models::registry::ModelRegistry;
-use crate::transcriber::{EngineType, TranscriptionResult, WhisperTranscriber, SenseVoiceTranscriber};
+use crate::transcriber::{EngineType, TranscriptionResult, SenseVoiceTranscriber, Transcriber};
 use axum::{
     extract::State,
     http::StatusCode,
@@ -19,7 +19,6 @@ use std::path::PathBuf;
 static TRANSCRIBER: Lazy<Mutex<Option<TranscriberWrapper>>> = Lazy::new(|| Mutex::new(None));
 
 enum TranscriberWrapper {
-    Whisper(WhisperTranscriber),
     SenseVoice(SenseVoiceTranscriber),
 }
 
@@ -38,7 +37,6 @@ impl RouterState {
         vad_threshold: f32,
         language: String,
     ) -> Self {
-        // Default model directory
         let model_dir = dirs::cache_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("handy-cli")
@@ -55,14 +53,9 @@ impl RouterState {
 
     pub fn load_transcriber(&self) -> Result<(), String> {
         let mut guard = TRANSCRIBER.lock().map_err(|e| e.to_string())?;
-        
-        // Check if already loaded with same engine
-        if let Some(ref current) = *guard {
-            match (current, self.engine.as_str()) {
-                (TranscriberWrapper::Whisper(_), "whisper") => return Ok(()),
-                (TranscriberWrapper::SenseVoice(_), "sensevoice") => return Ok(()),
-                _ => {} // Need to reload
-            }
+
+        if let Some(TranscriberWrapper::SenseVoice(_)) = &*guard {
+            return Ok(());
         }
 
         let model_id = self.model.clone().unwrap_or_else(|| {
@@ -74,22 +67,20 @@ impl RouterState {
         });
 
         let model_path = self.model_dir.join(&model_id);
-        
+
         if !model_path.exists() {
-            return Err(format!("Model not found: {:?}. Run `handy-cli download --model {}` first", model_path, model_id));
+            return Err(format!(
+                "Model not found: {:?}. Run `handy-cli download --model {}` first",
+                model_path, model_id
+            ));
         }
 
         let transcriber = match self.engine.as_str() {
-            "whisper" => {
-                // For whisper, we need the .bin file
-                let bin_path = model_path.join(format!("ggml-{}.bin", model_id));
-                let path = if bin_path.exists() { bin_path } else { model_path };
-                TranscriberWrapper::Whisper(WhisperTranscriber::new(&path)
-                    .map_err(|e| format!("Failed to load Whisper: {}", e))?)
-            }
             "sensevoice" => {
-                TranscriberWrapper::SenseVoice(SenseVoiceTranscriber::new(&model_path)
-                    .map_err(|e| format!("Failed to load SenseVoice: {}", e))?)
+                TranscriberWrapper::SenseVoice(
+                    SenseVoiceTranscriber::new(&model_path)
+                        .map_err(|e| format!("Failed to load SenseVoice: {}", e))?,
+                )
             }
             _ => return Err(format!("Unknown engine: {}", self.engine)),
         };
@@ -98,17 +89,22 @@ impl RouterState {
         Ok(())
     }
 
-    pub fn transcribe(&self, audio: &[f32], language: Option<&str>) -> Result<TranscriptionResult, String> {
+    pub fn transcribe(
+        &self,
+        audio: &[f32],
+        language: Option<&str>,
+    ) -> Result<TranscriptionResult, String> {
         let mut guard = TRANSCRIBER.lock().map_err(|e| e.to_string())?;
-        
+
         let lang = language.or_else(|| {
-            if self.language != "auto" { Some(self.language.as_str()) } else { None }
+            if self.language != "auto" {
+                Some(self.language.as_str())
+            } else {
+                None
+            }
         });
 
         match guard.as_mut() {
-            Some(TranscriberWrapper::Whisper(t)) => {
-                t.transcribe(audio, lang).map_err(|e| e.to_string())
-            }
             Some(TranscriberWrapper::SenseVoice(t)) => {
                 t.transcribe(audio, lang).map_err(|e| e.to_string())
             }
@@ -125,12 +121,17 @@ pub struct HealthResponse {
     pub loaded: bool,
 }
 
-pub async fn health(State(state): State<Arc<RouterState>>) -> Result<Json<HealthResponse>, AppError> {
-    // Try to load the transcriber
+pub async fn health(
+    State(state): State<Arc<RouterState>>,
+) -> Result<Json<HealthResponse>, AppError> {
     let loaded = state.load_transcriber().is_ok();
 
     Ok(Json(HealthResponse {
-        status: if loaded { "ok".to_string() } else { "model_not_loaded".to_string() },
+        status: if loaded {
+            "ok".to_string()
+        } else {
+            "model_not_loaded".to_string()
+        },
         engine: state.engine.clone(),
         model: state.model.clone(),
         loaded,
@@ -144,9 +145,11 @@ pub async fn list_models() -> Json<serde_json::Value> {
     }))
 }
 
-pub async fn list_downloaded_models(State(state): State<Arc<RouterState>>) -> Json<serde_json::Value> {
+pub async fn list_downloaded_models(
+    State(state): State<Arc<RouterState>>,
+) -> Json<serde_json::Value> {
     let mut downloaded = Vec::new();
-    
+
     if let Ok(entries) = std::fs::read_dir(&state.model_dir) {
         for entry in entries.flatten() {
             if entry.path().is_dir() {
@@ -162,7 +165,7 @@ pub async fn list_downloaded_models(State(state): State<Arc<RouterState>>) -> Js
 
 #[derive(Deserialize)]
 pub struct TranscribeRequest {
-    pub audio: String,  // base64 encoded audio
+    pub audio: String,
     pub language: Option<String>,
     pub sample_rate: Option<u32>,
 }
@@ -170,22 +173,19 @@ pub struct TranscribeRequest {
 #[derive(Serialize)]
 pub struct TranscribeResponse {
     pub text: String,
-    pub language: Option<String>,
-    pub duration: f32,
 }
 
 pub async fn transcribe(
     State(state): State<Arc<RouterState>>,
     Json(req): Json<TranscribeRequest>,
 ) -> Result<Json<TranscribeResponse>, AppError> {
-    // Decode base64 audio
-    let audio_bytes = BASE64.decode(&req.audio)
-        .map_err(|e| AppError::BadRequest(format!("Invalid base64 audio: {}", e)))?;
+    let audio_bytes = BASE64
+        .decode(&req.audio)
+        .map_err(|e| AppError::bad_request(format!("Invalid base64 audio: {}", e)))?;
 
-    // Convert to f32 samples (expects 16-bit PCM mono)
     let samples: Vec<f32> = audio_bytes
         .chunks(2)
-        .filter_map(|chunk| {
+        .filter_map(|chunk: &[u8]| {
             if chunk.len() == 2 {
                 let s = i16::from_le_bytes([chunk[0], chunk[1]]);
                 Some(s as f32 / i16::MAX as f32)
@@ -196,10 +196,11 @@ pub async fn transcribe(
         .collect();
 
     if samples.is_empty() {
-        return Err(AppError::BadRequest("No audio samples found".to_string()));
+        return Err(AppError::bad_request(
+            "No audio samples found".to_string(),
+        ));
     }
 
-    // Resample if needed (transcribe-rs expects 16kHz)
     let sample_rate = req.sample_rate.unwrap_or(16000);
     let final_samples = if sample_rate != 16000 {
         resample_audio(&samples, sample_rate, 16000)?
@@ -207,33 +208,22 @@ pub async fn transcribe(
         samples
     };
 
-    // Ensure transcriber is loaded
-    state.load_transcriber()
-        .map_err(|e| AppError::Internal(format!("Failed to load transcriber: {}", e)))?;
+    state
+        .load_transcriber()
+        .map_err(|e| AppError::internal(format!("Failed to load transcriber: {}", e)))?;
 
-    // Transcribe
-    let result = state.transcribe(&final_samples, req.language.as_deref())
-        .map_err(|e| AppError::Internal(format!("Transcription failed: {}", e)))?;
+    let result = state
+        .transcribe(&final_samples, req.language.as_deref())
+        .map_err(|e| AppError::internal(format!("Transcription failed: {}", e)))?;
 
-    Ok(Json(TranscribeResponse {
-        text: result.text,
-        language: result.language,
-        duration: result.duration,
-    }))
+    Ok(Json(TranscribeResponse { text: result.text }))
 }
 
-pub async fn transcribe_stream(
-    State(state): State<Arc<RouterState>>,
-    Json(req): Json<TranscribeRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    // For streaming, we just do the same as regular transcribe for now
-    // A full implementation would use SSE
-    transcribe(State(state), Json(req)).await
-    .map(|r| Json(json!({"text": r.text, "language": r.language, "duration": r.duration})))
-}
-
-/// Simple resampling using linear interpolation
-fn resample_audio(samples: &[f32], from_rate: u32, to_rate: u32) -> Result<Vec<f32>, AppError> {
+fn resample_audio(
+    samples: &[f32],
+    from_rate: u32,
+    to_rate: u32,
+) -> Result<Vec<f32>, AppError> {
     if from_rate == to_rate {
         return Ok(samples.to_vec());
     }
@@ -245,10 +235,11 @@ fn resample_audio(samples: &[f32], from_rate: u32, to_rate: u32) -> Result<Vec<f
     for i in 0..new_len {
         let src_idx = i as f32 / ratio;
         let src_idx_floor = src_idx.floor() as usize;
-        let src_idx_ceil = src_idx.ceil() as usize.min(samples.len() - 1);
+        let src_idx_ceil = (src_idx.ceil() as usize).min(samples.len() - 1);
         let frac = src_idx - src_idx.floor();
 
-        let sample = samples[src_idx_floor] * (1.0 - frac) + samples[src_idx_ceil] * frac;
+        let sample =
+            samples[src_idx_floor] * (1.0 - frac) + samples[src_idx_ceil] * frac;
         resampled.push(sample);
     }
 
@@ -260,6 +251,20 @@ pub struct AppError {
     status: StatusCode,
 }
 
+impl AppError {
+    pub fn new(status: StatusCode, message: String) -> Self {
+        Self { message, status }
+    }
+
+    pub fn bad_request(message: String) -> Self {
+        Self::new(StatusCode::BAD_REQUEST, message)
+    }
+
+    pub fn internal(message: String) -> Self {
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR, message)
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         (self.status, Json(json!({ "error": self.message }))).into_response()
@@ -268,27 +273,14 @@ impl IntoResponse for AppError {
 
 impl From<base64::DecodeError> for AppError {
     fn from(err: base64::DecodeError) -> Self {
-        Self {
-            message: format!("Base64 decode error: {}", err),
-            status: StatusCode::BAD_REQUEST,
-        }
+        Self::bad_request(format!("Base64 decode error: {}", err))
     }
 }
 
 impl From<String> for AppError {
     fn from(err: String) -> Self {
-        Self {
-            message: err,
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-        }
+        Self::internal(err)
     }
 }
 
-impl From<std::sync::PoisonError<std::sync::MutexGuard<'_, Option<TranscriberWrapper>>>> for AppError {
-    fn from(_: std::sync::PoisonError<std::sync::MutexGuard<'_, Option<TranscriberWrapper>>>) -> Self {
-        Self {
-            message: "Mutex poisoned".to_string(),
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-        }
-    }
-}
+

@@ -1,7 +1,7 @@
 // Voice Activity Detection module using vad-rs
 
 use anyhow::Result;
-use vad_rs::{Vad, VadEngine, VadMode, VadWebRTMode};
+use vad_rs::Vad;
 
 pub struct VadProcessor {
     vad: Vad,
@@ -9,41 +9,22 @@ pub struct VadProcessor {
 }
 
 impl VadProcessor {
-    pub fn new(threshold: f32) -> Result<Self> {
-        let vad = Vad::new(
-            VadEngine::DEFAULT,
-            VadMode::NORMAL,
-            16000,
-            VadWebRTMode::Unset,
-        )?;
-
+    pub fn new(model_path: &std::path::Path, threshold: f32) -> Result<Self> {
+        let vad = Vad::new(model_path, 16000)
+            .map_err(|e| anyhow::anyhow!("Failed to load VAD model: {}", e))?;
         Ok(Self { vad, threshold })
     }
 
     /// Process audio samples and return whether speech is detected
-    pub fn is_speech(&self, samples: &[f32]) -> bool {
-        // vad-rs expects i16 samples at 16kHz
-        let pcm: Vec<i16> = samples
-            .iter()
-            .map(|s| ((s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16))
-            .collect();
-
-        // Process in 30ms windows (480 samples at 16kHz)
-        let window_size = (16000 * 30 / 1000) as usize;
-
-        for window in pcm.chunks(window_size) {
-            if let Some(prob) = self.vad.predict(window) {
-                if prob > self.threshold {
-                    return true;
-                }
-            }
+    pub fn is_speech(&mut self, samples: &[f32]) -> bool {
+        match self.vad.compute(samples) {
+            Ok(result) => result.prob > self.threshold,
+            Err(_) => false,
         }
-
-        false
     }
 
     /// Reset VAD state
     pub fn reset(&mut self) {
-        // vad-rs doesn't have explicit reset
+        // vad-rs maintains state internally via h/c tensors
     }
 }

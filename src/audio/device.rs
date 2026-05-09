@@ -1,6 +1,6 @@
 // Audio device enumeration
 
-use cpal::Device;
+use cpal::traits::{DeviceTrait, HostTrait};
 
 #[derive(Debug, Clone)]
 pub struct AudioDevice {
@@ -9,26 +9,23 @@ pub struct AudioDevice {
 }
 
 impl AudioDevice {
-    pub fn from_cpal(device: &Device, is_default: bool) -> Self {
-        let name = device
-            .name()
-            .unwrap_or_else(|_| "Unknown".to_string());
+    pub fn from_cpal(device: &cpal::Device, is_default: bool) -> Self {
+        let name = device.name().unwrap_or_else(|_| "Unknown".to_string());
         Self { name, is_default }
     }
 
-    /// List all available input audio devices
     pub fn list_input_devices() -> Vec<Self> {
         let mut devices = Vec::new();
 
-        if let Ok(host) = cpal::default_host().try_lock() {
-            let default = cpal::default_input_device();
+        let host = cpal::default_host();
+        let default = host.default_input_device();
 
-            for device in host.input_devices().into_iter().flatten() {
+        if let Ok(device_enum) = host.input_devices() {
+            for device in device_enum {
                 let is_default = default
                     .as_ref()
                     .map(|d| d.name().ok() == device.name().ok())
                     .unwrap_or(false);
-
                 devices.push(AudioDevice::from_cpal(&device, is_default));
             }
         }

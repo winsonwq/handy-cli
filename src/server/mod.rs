@@ -3,12 +3,9 @@
 pub mod handlers;
 
 use crate::server::handlers::{
-    health, list_downloaded_models, list_models, transcribe, transcribe_stream, RouterState,
+    health, list_downloaded_models, list_models, transcribe, RouterState,
 };
-use axum::{
-    routing::{get, post},
-    Router,
-};
+use axum::{routing::{get, post}, Router};
 use std::sync::Arc;
 
 pub fn create_app(
@@ -29,6 +26,5 @@ pub fn create_app(
         .route("/api/models", get(list_models))
         .route("/api/models/downloaded", get(list_downloaded_models))
         .route("/api/transcribe", post(transcribe))
-        .route("/api/transcribe/stream", post(transcribe_stream))
         .with_state(state)
 }

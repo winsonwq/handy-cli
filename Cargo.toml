@@ -30,8 +30,8 @@ hound = "3.5"
 # VAD
 vad-rs = { git = "https://github.com/cjpais/vad-rs", default-features = false }
 
-# Transcription
-transcribe-rs = { version = "0.3.8", features = ["whisper-cpp", "onnx"] }
+# Transcription - same as Handy
+transcribe-rs = { version = "0.3.3", features = ["whisper-cpp", "onnx"] }
 
 # HTTP client (for model download, uses rustls instead of openssl)
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
@@ -61,9 +61,6 @@ transcribe-rs = { version = "0.3.3", features = ["whisper-vulkan", "ort-directml
 
 [target.'cfg(target_os = "macos")'.dependencies]
 transcribe-rs = { version = "0.3.3", features = ["whisper-metal"] }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-transcribe-rs = { version = "0.3.3", features = ["whisper-vulkan"] }
 
 [profile.release]
 lto = true
