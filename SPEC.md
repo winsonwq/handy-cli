@@ -379,9 +379,10 @@ Features from Handy that are not yet implemented in handy-cli:
 - [ ] Translation to English mode
 
 ### Phase 6: Packaging & Release
-- [ ] GitHub Actions CI/CD
-- [ ] Cross-platform packaging
-- [ ] Release publishing
+- [x] GitHub Actions CI/CD workflows
+- [ ] Cross-platform packaging (CI builds)
+- [ ] Release publishing (on tag)
+- [ ] Pre-built binaries distribution
 
 ## License
 
