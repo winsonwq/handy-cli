@@ -53,7 +53,14 @@ handy-cli 是一个独立运行的 AI 听写 CLI 工具，提取自 [Handy](http
   "text": "转写文字内容",
   "language": "zh",
   "duration": 3.5,
-  "language_probability": 0.99
+  "language_probability": 0.99,
+  "segments": [
+    {
+      "text": "第一段文字",
+      "start": 0.0,
+      "end": 1.5
+    }
+  ]
 }
 ```
 
@@ -89,14 +96,20 @@ data: {"text": "最终转写结果。", "partial": false}
 
 支持多种引擎，通过 `transcribe-rs` 实现：
 
-| 引擎 | 模型 | 模型大小 | 特点 |
-|------|------|---------|------|
-| whisper.cpp | tiny/base/small/medium/large | ~75MB/~150MB/~500MB/~1.5GB/~3GB | 多语言 |
-| SenseVoice | sense-voice-int8 | ~230MB | 中文优化、自带标点 |
+| 引擎 | 模型 | 模型大小 | 模型格式 | 特点 |
+|------|------|---------|---------|------|
+| whisper.cpp | tiny/base/small/medium/large | ~75MB/~150MB/~465MB/~1.5GB/~3GB | 单文件 `ggml-{model}.bin` | 多语言 |
+| SenseVoice | sense-voice-int8 | ~230MB | 目录（包含 `model.int8.onnx` 和 `tokens.txt`） | 中文优化、自带标点 |
 
 **模型下载：**
-- 从 Handy 官方 CDN 下载（`blob.handy.computer`）
-- 或从 HuggingFace 下载
+- Whisper 模型：从 HuggingFace 下载（`ggerganov/whisper.cpp`）
+- SenseVoice 模型：从 Handy 官方 CDN 下载（`blob.handy.computer`）
+
+**Whisper 模型下载命令：**
+```bash
+curl -L -o ~/.cache/handy-cli/models/ggml-tiny.bin \
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
+```
 
 ### 5. CLI 命令
 
@@ -224,8 +237,8 @@ handy-cli/
 │   │   └── mod.rs           # vad-rs 封装
 │   ├── transcriber/
 │   │   ├── mod.rs
-│   │   ├── whisper.rs       # whisper.cpp
-│   │   └── sensevoice.rs    # SenseVoice
+│   │   ├── whisper.rs       # whisper.cpp (ggml-*.bin)
+│   │   └── sensevoice.rs    # SenseVoice (ONNX)
 │   ├── models/
 │   │   ├── mod.rs
 │   │   ├── manager.rs       # 模型管理/下载

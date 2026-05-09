@@ -90,7 +90,25 @@ POST /api/transcribe
 | 引擎 | 模型 | 大小 | 特点 |
 |------|------|------|------|
 | SenseVoice | sense-voice-int8 | ~230MB | 中文优化、自带标点 |
-| Whisper | small/medium/large | ~465MB/~1.5GB/~3GB | 多语言 |
+| Whisper | tiny/base/small/medium/large | ~75MB/~150MB/~465MB/~1.5GB/~3GB | 多语言支持 |
+
+### Whisper 模型
+
+Whisper 模型需要从 HuggingFace 下载，文件命名规则为 `ggml-{model}.bin`：
+
+```bash
+# 下载 tiny 模型 (~75MB)
+curl -L -o ~/.cache/handy-cli/models/ggml-tiny.bin \
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
+
+# 下载 base 模型 (~150MB)
+curl -L -o ~/.cache/handy-cli/models/ggml-base.bin \
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+
+# 下载 small 模型 (~465MB)
+curl -L -o ~/.cache/handy-cli/models/ggml-small.bin \
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+```
 
 ## 架构
 

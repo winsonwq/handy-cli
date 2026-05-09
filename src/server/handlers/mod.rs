@@ -1,7 +1,7 @@
 // HTTP request handlers for handy-cli
 
 use crate::models::registry::ModelRegistry;
-use crate::transcriber::{EngineType, TranscriptionResult, SenseVoiceTranscriber, Transcriber};
+use crate::transcriber::{EngineType, TranscriptionResult, SenseVoiceTranscriber, Transcriber, WhisperTranscriber};
 use axum::{
     extract::State,
     http::StatusCode,
@@ -20,6 +20,7 @@ static TRANSCRIBER: Lazy<Mutex<Option<TranscriberWrapper>>> = Lazy::new(|| Mutex
 
 enum TranscriberWrapper {
     SenseVoice(SenseVoiceTranscriber),
+    Whisper(WhisperTranscriber),
 }
 
 pub struct RouterState {
@@ -54,8 +55,11 @@ impl RouterState {
     pub fn load_transcriber(&self) -> Result<(), String> {
         let mut guard = TRANSCRIBER.lock().map_err(|e| e.to_string())?;
 
-        if let Some(TranscriberWrapper::SenseVoice(_)) = &*guard {
-            return Ok(());
+        // Check if already loaded with the same engine
+        match (&*guard, self.engine.as_str()) {
+            (Some(TranscriberWrapper::SenseVoice(_)), "sensevoice") => return Ok(()),
+            (Some(TranscriberWrapper::Whisper(_)), "whisper") => return Ok(()),
+            _ => {}
         }
 
         let model_id = self.model.clone().unwrap_or_else(|| {
@@ -66,7 +70,13 @@ impl RouterState {
             }
         });
 
-        let model_path = self.model_dir.join(&model_id);
+        // For whisper, model_id refers to the model name (small, base, etc.)
+        // The actual file is ggml-{model_id}.bin
+        let model_path = if self.engine == "whisper" {
+            self.model_dir.join(format!("ggml-{}.bin", model_id))
+        } else {
+            self.model_dir.join(&model_id)
+        };
 
         if !model_path.exists() {
             return Err(format!(
@@ -80,6 +90,12 @@ impl RouterState {
                 TranscriberWrapper::SenseVoice(
                     SenseVoiceTranscriber::new(&model_path)
                         .map_err(|e| format!("Failed to load SenseVoice: {}", e))?,
+                )
+            }
+            "whisper" => {
+                TranscriberWrapper::Whisper(
+                    WhisperTranscriber::new(&model_path)
+                        .map_err(|e| format!("Failed to load Whisper: {}", e))?,
                 )
             }
             _ => return Err(format!("Unknown engine: {}", self.engine)),
@@ -106,6 +122,9 @@ impl RouterState {
 
         match guard.as_mut() {
             Some(TranscriberWrapper::SenseVoice(t)) => {
+                t.transcribe(audio, lang).map_err(|e| e.to_string())
+            }
+            Some(TranscriberWrapper::Whisper(t)) => {
                 t.transcribe(audio, lang).map_err(|e| e.to_string())
             }
             None => Err("Transcriber not loaded. Call /api/health first".to_string()),

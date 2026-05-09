@@ -47,7 +47,10 @@ impl Transcriber for SenseVoiceTranscriber {
 
         Ok(TranscriptionResult {
             text: result.text,
+            language: None,
+            duration: 0.0,
             segments,
+            language_probability: None,
         })
     }
 

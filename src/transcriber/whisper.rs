@@ -36,9 +36,10 @@ impl Transcriber for WhisperTranscriber {
 
         Ok(TranscriptionResult {
             text: result.text,
-            language: result.language,
-            duration: result.duration.unwrap_or(0.0),
-            language_probability: result.language_probability,
+            language: None,
+            duration: 0.0,
+            segments: None,
+            language_probability: None,
         })
     }
 

@@ -7,13 +7,18 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 pub mod sensevoice;
+pub mod whisper;
 
 pub use sensevoice::SenseVoiceTranscriber;
+pub use whisper::WhisperTranscriber;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranscriptionResult {
     pub text: String,
+    pub language: Option<String>,
+    pub duration: f32,
     pub segments: Option<Vec<TranscriptionSegment>>,
+    pub language_probability: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
