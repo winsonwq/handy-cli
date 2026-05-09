@@ -1,78 +1,64 @@
 // download command - download a model
 
-use crate::models::registry::ModelRegistry;
+use crate::models::{DownloadProgress, ModelManager};
 use anyhow::Result;
-use futures_util::StreamExt;
-use std::path::PathBuf;
-use flate2::read::GzDecoder;
-use tar::Archive;
 
 pub async fn run(model_id: &str) -> Result<()> {
     println!("=== Downloading model: {} ===\n", model_id);
 
-    // Find model
-    let model = ModelRegistry::get(model_id)
-        .ok_or_else(|| anyhow::anyhow!("Model '{}' not found. Run `handy-cli list-models` to see available models.", model_id))?;
-
-    let url = model.url
-        .ok_or_else(|| anyhow::anyhow!("Model '{}' has no download URL", model_id))?;
-
-    println!("Downloading {} from {}", model.name, url);
-    println!("Size: {} MB", model.size_mb);
-
     let cache_dir = dirs::cache_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("handy-cli")
         .join("models");
 
-    // Create cache directory
-    std::fs::create_dir_all(&cache_dir)?;
+    let download_url = "https://blob.handy.computer".to_string();
 
-    let dest_dir = cache_dir.join(model_id);
-    let dest_file = cache_dir.join(format!("{}.tar.gz", model_id));
+    let manager = ModelManager::new(cache_dir, download_url);
+
+    // Check if model exists
+    let model_info = manager.get_model_info(model_id);
+    let model = match model_info {
+        Some(m) => m,
+        None => {
+            anyhow::bail!("Model '{}' not found. Run `handy-cli list-models` to see available models.", model_id);
+        }
+    };
+
+    if !model.url.is_some() {
+        anyhow::bail!("Model '{}' has no download URL", model_id);
+    }
+
+    println!("Downloading {}...", model.name);
+    println!("Size: {} MB", model.size_mb);
+    println!();
+
+    // Create progress channel
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<DownloadProgress>();
+
+    // Spawn progress printer
+    let progress_handle = tokio::spawn(async move {
+        while let Some(progress) = rx.recv().await {
+            if progress.total > 0 {
+                println!(
+                    "\rProgress: {:.1}% ({:.1} MB / {:.1} MB)  ",
+                    progress.percentage,
+                    progress.downloaded as f64 / 1_000_000.0,
+                    progress.total as f64 / 1_000_000.0,
+                );
+            } else {
+                println!("\rDownloaded: {:.1} MB", progress.downloaded as f64 / 1_000_000.0);
+            }
+        }
+    });
 
     // Download with progress
-    println!("\nDownloading...");
-    let response = reqwest::get(&url).await?;
-    let total_size = response.content_length().unwrap_or(0);
+    manager.download_model(model_id, Some(tx)).await?;
 
-    let mut file = std::fs::File::create(&dest_file)?;
-    let mut stream = response.bytes_stream();
-    let mut downloaded: u64 = 0;
+    // Wait for progress to finish
+    let _ = progress_handle.await;
 
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk?;
-        std::io::Write::write_all(&mut file, &chunk)?;
-        downloaded += chunk.len() as u64;
-        if total_size > 0 {
-            let percentage = (downloaded as f64 / total_size as f64) * 100.0;
-            print!("\rProgress: {:.1}% ({:.1} MB / {:.1} MB)", 
-                   percentage, 
-                   downloaded as f64 / 1_000_000.0, 
-                   total_size as f64 / 1_000_000.0);
-        }
-    }
-    println!("\n\nDownload complete!");
-
-    // Extract tar.gz
-    println!("Extracting to {:?}...", dest_dir);
-    
-    // Remove existing directory if it exists
-    if dest_dir.exists() {
-        std::fs::remove_dir_all(&dest_dir)?;
-    }
-    std::fs::create_dir_all(&dest_dir)?;
-
-    let tar_gz = std::fs::File::open(&dest_file)?;
-    let tar = GzDecoder::new(tar_gz);
-    let mut archive = Archive::new(tar);
-    archive.unpack(&dest_dir)?;
-
-    // Remove the tar.gz file
-    std::fs::remove_file(&dest_file)?;
-
-    println!("\n✓ Model '{}' downloaded and extracted successfully!", model_id);
-    println!("  Model path: {:?}", dest_dir);
+    println!("\n\n✓ Model '{}' downloaded successfully!", model_id);
+    println!("  Path: {:?}", manager.get_model_path(model_id));
 
     Ok(())
 }

@@ -1,62 +1,62 @@
-# handy-cli — AI 听写核心工具
+# handy-cli — AI Transcription Core Tool
 
-## 概述
+## Overview
 
-handy-cli 是一个独立运行的 AI 听写 CLI 工具，提取自 [Handy](https://github.com/cjpais/Handy)（Tauri 应用）的核心功能。
+handy-cli is a standalone AI transcription CLI tool, extracting core functionality from [Handy](https://github.com/cjpais/Handy) (Tauri application).
 
-**目标：** 提供一个跨平台（macOS/Linux/Windows）的命令行工具，启动 HTTP 服务提供语音转文字功能，无需安装任何运行时。
+**Goal:** Provide a cross-platform (macOS/Linux/Windows) command-line tool that starts an HTTP server for speech-to-text functionality, without requiring any runtime installation.
 
-## 核心原则
+## Core Principles
 
-1. **零依赖运行** — 打包成单个可执行文件，用户直接下载运行
-2. **保留 Handy 优势** — 多引擎支持、模型管理、VAD 等
-3. **CLI 可配置** — 通过命令行参数或配置文件调整行为
-4. **无 UI** — 纯 CLI + HTTP API，专注后端能力
+1. **Zero-dependency runtime** — Packaged as a single executable, users download and run directly
+2. **Preserve Handy advantages** — Multi-engine support, model management, VAD, etc.
+3. **CLI-configurable** — Adjust behavior via command-line arguments or config file
+4. **No UI** — Pure CLI + HTTP API, focused on backend capabilities
 
-## 与 Handy 的关系
+## Relationship with Handy
 
-| 组件 | Handy (Tauri) | Handy (本项目) |
-|------|--------------|---------------|
-| 前端 | React UI | ❌ 移除 |
-| 快捷键 | rdev/enigo | ❌ 移除 |
-| 文字注入 | CGEvent/SendInput | ❌ 移除 |
-| 菜单栏/Tray | Tauri API | ❌ 移除 |
-| 音频采集 | cpal | ✅ 保留 |
-| VAD | vad-rs | ✅ 保留 |
-| ASR 引擎 | transcribe-rs | ✅ 保留 |
-| 模型管理 | 现有逻辑 | ✅ 保留 |
-| HTTP 服务 | ❌ | ✅ 新增 |
+| Component | Handy (Tauri) | Handy-cli (This Project) |
+|-----------|---------------|--------------------------|
+| Frontend | React UI | ❌ Removed |
+| Hotkeys | rdev/enigo | ❌ Removed |
+| Text injection | CGEvent/SendInput | ❌ Removed |
+| Menu bar/Tray | Tauri API | ❌ Removed |
+| Audio capture | cpal | ✅ Preserved |
+| VAD | vad-rs | ✅ Preserved |
+| ASR Engine | transcribe-rs | ✅ Preserved |
+| Model management | Existing logic | ✅ Preserved |
+| HTTP service | ❌ | ✅ New |
 
-## 功能列表
+## Feature List
 
-### 1. HTTP API 服务
+### 1. HTTP API Service
 
-启动本地 HTTP 服务，提供 REST + SSE 接口。
+Start a local HTTP service providing REST + SSE interfaces.
 
-**端点：**
+**Endpoints:**
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/health` | 健康检查 |
-| GET | `/api/models` | 列出可用模型 |
-| GET | `/api/models/downloaded` | 列出已下载模型 |
-| POST | `/api/models/download` | 下载模型 |
-| POST | `/api/transcribe` | 转写音频（JSON body） |
-| POST | `/api/transcribe/stream` | 流式转写（SSE） |
-| POST | `/api/audio/start` | 开始录音 |
-| POST | `/api/audio/stop` | 停止录音 |
-| GET | `/api/audio/status` | 录音状态 |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Health check |
+| GET | `/api/models` | List available models |
+| GET | `/api/models/downloaded` | List downloaded models |
+| POST | `/api/models/download` | Download model |
+| POST | `/api/transcribe` | Transcribe audio (JSON body) |
+| POST | `/api/transcribe/stream` | Streaming transcription (SSE) |
+| POST | `/api/audio/start` | Start recording |
+| POST | `/api/audio/stop` | Stop recording |
+| GET | `/api/audio/status` | Recording status |
 
-**转写响应格式：**
+**Transcription Response Format:**
 ```json
 {
-  "text": "转写文字内容",
+  "text": "Transcribed text content",
   "language": "zh",
   "duration": 3.5,
   "language_probability": 0.99,
   "segments": [
     {
-      "text": "第一段文字",
+      "text": "First segment",
       "start": 0.0,
       "end": 1.5
     }
@@ -64,7 +64,7 @@ handy-cli 是一个独立运行的 AI 听写 CLI 工具，提取自 [Handy](http
 }
 ```
 
-**SSE 事件：**
+**SSE Events:**
 ```
 event: speech_start
 data: {"timestamp": 1234567890}
@@ -73,74 +73,77 @@ event: speech_end
 data: {"timestamp": 1234567890, "duration": 3.5}
 
 event: transcript
-data: {"text": "转写中...", "partial": true}
+data: {"text": "Transcribing...", "partial": true}
 
 event: transcript
-data: {"text": "最终转写结果。", "partial": false}
+data: {"text": "Final transcription result.", "partial": false}
 ```
 
-### 2. 音频采集
+### 2. Audio Capture
 
-- 使用 `cpal` 跨平台采集麦克风音频
-- 支持采样率配置（默认 16kHz）
-- 支持选择输入设备
-- 音频格式：float32 PCM
+- Cross-platform microphone capture using `cpal`
+- Configurable sample rate (default 16kHz)
+- Input device selection
+- Audio format: float32 PCM
 
 ### 3. VAD (Voice Activity Detection)
 
-- 使用 `vad-rs` 进行语音活动检测
-- 可配置阈值、静音时长等参数
-- 事件：`speech_start`, `speech_end`
+- Voice activity detection using `vad-rs`
+- Configurable threshold, silence duration, etc.
+- Events: `speech_start`, `speech_end`
 
-### 4. ASR 引擎
+### 4. ASR Engines
 
-支持多种引擎，通过 `transcribe-rs` 实现：
+Multiple engine support via `transcribe-rs`:
 
-| 引擎 | 模型 | 模型大小 | 模型格式 | 特点 |
-|------|------|---------|---------|------|
-| whisper.cpp | tiny/base/small/medium/large | ~75MB/~150MB/~465MB/~1.5GB/~3GB | 单文件 `ggml-{model}.bin` | 多语言 |
-| SenseVoice | sense-voice-int8 | ~230MB | 目录（包含 `model.int8.onnx` 和 `tokens.txt`） | 中文优化、自带标点 |
+| Engine | Models | Size | Format | Features |
+|--------|--------|------|--------|----------|
+| Whisper.cpp | tiny/base/small/medium/large | ~75MB/~150MB/~465MB/~1.5GB/~3GB | Single file `ggml-{model}.bin` | Multi-language |
+| SenseVoice | sense-voice-int8 | ~230MB | Directory (contains `model.int8.onnx` and `tokens.txt`) | Chinese optimized, built-in punctuation |
 
-**模型下载：**
-- Whisper 模型：从 HuggingFace 下载（`ggerganov/whisper.cpp`）
-- SenseVoice 模型：从 Handy 官方 CDN 下载（`blob.handy.computer`）
+**Model Downloads:**
+- Whisper models: Download from HuggingFace (`ggerganov/whisper.cpp`)
+- SenseVoice models: Download from Handy official CDN (`blob.handy.computer`)
 
-**Whisper 模型下载命令：**
+**Whisper Model Download Commands:**
 ```bash
 curl -L -o ~/.cache/handy-cli/models/ggml-tiny.bin \
   "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
 ```
 
-### 5. CLI 命令
+### 5. CLI Commands
 
 ```bash
-# 启动 HTTP 服务
-handy-cli serve [选项]
+# Start HTTP server
+handy-cli serve [OPTIONS]
 
-# 选项：
-#   --port <端口>        HTTP 端口（默认 8765）
-#   --host <地址>       监听地址（默认 127.0.0.1）
-#   --engine <引擎>     whisper / sensevoice（默认 sensevoice）
-#   --model <模型>      模型名称（默认 sense-voice-int8）
-#   --vad-threshold     VAD 阈值 0.0-1.0（默认 0.5）
-#   --language <语言>    语言代码（默认 auto）
+# Options:
+#   --port <PORT>        HTTP port (default 8765)
+#   --host <HOST>        Listen address (default 127.0.0.1)
+#   --engine <ENGINE>    whisper / sensevoice (default sensevoice)
+#   --model <MODEL>      Model name (default sense-voice-int8)
+#   --vad-threshold      VAD threshold 0.0-1.0 (default 0.5)
+#   --language <LANG>   Language code (default auto)
 
-# 列出可用模型
-handy-cli list-models
+# List available models
+handy-cli list-models [--engine <ENGINE>]
 
-# 下载模型
-handy-cli download --model <模型名>
+# Download model
+handy-cli download --model <MODEL>
 
-# 检查环境
+# Delete model
+handy-cli delete --model <MODEL>
+
+# Check environment
 handy-cli doctor
 
-# 版本信息
+# Version info
 handy-cli --version
 ```
 
-### 6. 配置文件
+### 6. Configuration File
 
-支持 YAML 配置文件（`~/.handy-cli/config.yaml`）：
+YAML configuration file support (`~/.handy-cli/config.yaml`):
 
 ```yaml
 server:
@@ -165,12 +168,12 @@ models:
   download_url: https://blob.handy.computer
 ```
 
-## 架构
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    CLI (clap)                           │
-│   serve / list-models / download / doctor               │
+│   serve / list-models / download / delete / doctor      │
 └───────────────────────┬─────────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────────┐
@@ -184,8 +187,8 @@ models:
 └───────────────────────┬─────────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────────┐
-│                    VAD (vad-rs)                        │
-│   speech detection                                      │
+│                    VAD (vad-rs)                         │
+│   speech detection                                     │
 └───────────────────────┬─────────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────────┐
@@ -194,36 +197,37 @@ models:
 └─────────────────────────────────────────────────────────┘
 ```
 
-## 技术栈
+## Tech Stack
 
-| 组件 | 技术 | 版本 |
-|------|------|------|
-| 语言 | Rust | 1.75+ |
-| Web 框架 | axum | 0.7+ |
-| 音频采集 | cpal | 0.16+ |
+| Component | Technology | Version |
+|-----------|------------|---------|
+| Language | Rust | 1.75+ |
+| Web Framework | axum | 0.7+ |
+| Audio Capture | cpal | 0.16+ |
 | VAD | vad-rs | git |
 | ASR | transcribe-rs | 0.3+ |
 | CLI | clap | 4.x |
-| 日志 | tracing | 0.1+ |
-| 配置 | serde_yaml | 0.9+ |
+| Logging | tracing | 0.1+ |
+| Config | serde_yaml | 0.9+ |
 
-## 项目结构
+## Project Structure
 
 ```
 handy-cli/
 ├── Cargo.toml
 ├── src/
-│   ├── main.rs              # CLI 入口
+│   ├── main.rs              # CLI entry point
 │   ├── commands/
 │   │   ├── mod.rs
-│   │   ├── serve.rs        # serve 命令
-│   │   ├── list_models.rs  # list-models 命令
-│   │   ├── download.rs     # download 命令
-│   │   └── doctor.rs       # doctor 命令
+│   │   ├── serve.rs        # serve command
+│   │   ├── list_models.rs  # list-models command
+│   │   ├── download.rs     # download command
+│   │   ├── delete.rs       # delete command
+│   │   └── doctor.rs       # doctor command
 │   ├── server/
 │   │   ├── mod.rs
-│   │   ├── api.rs          # REST 端点
-│   │   ├── sse.rs           # SSE 端点
+│   │   ├── api.rs          # REST endpoints
+│   │   ├── sse.rs          # SSE endpoints
 │   │   └── handlers/
 │   │       ├── mod.rs
 │   │       ├── health.rs
@@ -231,62 +235,63 @@ handy-cli/
 │   │       └── models.rs
 │   ├── audio/
 │   │   ├── mod.rs
-│   │   ├── capture.rs       # cpal 采集
-│   │   └── device.rs        # 设备管理
+│   │   ├── capture.rs      # cpal capture
+│   │   └── device.rs       # device management
 │   ├── vad/
-│   │   └── mod.rs           # vad-rs 封装
+│   │   └── mod.rs          # vad-rs wrapper
 │   ├── transcriber/
 │   │   ├── mod.rs
-│   │   ├── whisper.rs       # whisper.cpp (ggml-*.bin)
-│   │   └── sensevoice.rs    # SenseVoice (ONNX)
+│   │   ├── whisper.rs      # whisper.cpp (ggml-*.bin)
+│   │   └── sensevoice.rs   # SenseVoice (ONNX)
 │   ├── models/
 │   │   ├── mod.rs
-│   │   ├── manager.rs       # 模型管理/下载
-│   │   └── registry.rs      # 模型注册表
+│   │   ├── manager.rs      # model management/download
+│   │   └── registry.rs     # model registry
 │   ├── config/
-│   │   └── mod.rs           # 配置文件
-│   └── error.rs             # 错误类型
-├── config.yaml.example      # 配置文件示例
-├── build.rs                 # Tauri build（预留）
+│   │   └── mod.rs          # config file
+│   └── error.rs            # error types
+├── config.yaml.example     # config file example
+├── build.rs                # Tauri build (reserved)
 └── README.md
 ```
 
-## 打包输出
+## Build Outputs
 
-| 平台 | 格式 | 文件名 |
-|------|------|--------|
+| Platform | Format | Filename |
+|----------|--------|----------|
 | macOS Apple Silicon | tar.gz | handy-macos-aarch64.tar.gz |
 | macOS Intel | tar.gz | handy-macos-x86_64.tar.gz |
 | Linux | tar.gz | handy-linux-x86_64.tar.gz |
 | Windows | zip | handy-windows-x86_64.zip |
 
-## 开发计划
+## Development Plan
 
-### Phase 1: 核心抽取
-- [ ] 创建 Cargo 项目
-- [ ] 实现音频采集（cpal）
-- [ ] 实现 VAD（vad-rs）
-- [ ] 实现 ASR 引擎（transcribe-rs）
-- [ ] 实现基础 HTTP 服务
+### Phase 1: Core Extraction
+- [x] Create Cargo project
+- [x] Implement audio capture (cpal)
+- [x] Implement VAD (vad-rs)
+- [x] Implement ASR engines (transcribe-rs)
+- [x] Implement basic HTTP service
 
-### Phase 2: CLI 功能
-- [ ] CLI 命令框架（clap）
-- [ ] serve 命令
-- [ ] list-models 命令
-- [ ] download 命令
-- [ ] 配置文件支持
+### Phase 2: CLI Features
+- [x] CLI command framework (clap)
+- [x] serve command
+- [x] list-models command
+- [x] download command
+- [x] delete command
+- [x] Config file support
 
-### Phase 3: 完善
-- [ ] 健康检查和状态接口
-- [ ] 流式转写（SSE）
-- [ ] 模型管理增强
-- [ ] 文档和示例
+### Phase 3: Enhancement
+- [x] Health check and status endpoints
+- [x] Streaming transcription (SSE)
+- [x] Model management enhancements
+- [x] Documentation and examples
 
-### Phase 4: 打包发布
+### Phase 4: Packaging & Release
 - [ ] GitHub Actions CI/CD
-- [ ] 跨平台打包
-- [ ] Release 发布
+- [ ] Cross-platform packaging
+- [ ] Release publishing
 
-## 许可
+## License
 
-MIT License（与 Handy 保持一致）
+MIT License (consistent with Handy)

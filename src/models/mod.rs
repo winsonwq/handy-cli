@@ -4,4 +4,4 @@ pub mod manager;
 pub mod registry;
 
 pub use manager::ModelManager;
-pub use registry::{ModelInfo, ModelRegistry, EngineType};
+pub use registry::{DownloadProgress, ModelInfo, ModelRegistry, EngineType};

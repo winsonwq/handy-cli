@@ -36,7 +36,7 @@ enum Commands {
         #[arg(long, default_value = "127.0.0.1")]
         host: String,
 
-        /// Engine to use (whisper or sensevoice)
+        /// Engine to use (whisper, sensevoice, parakeet, moonshine, gigaam, canary, cohere)
         #[arg(long, default_value = "sensevoice")]
         engine: String,
 
@@ -53,10 +53,20 @@ enum Commands {
         language: String,
     },
     /// List available models
-    ListModels,
+    ListModels {
+        /// Filter by engine type (whisper, sensevoice, parakeet, moonshine, gigaam, canary, cohere)
+        #[arg(long)]
+        engine: Option<String>,
+    },
     /// Download a model
     Download {
         /// Model ID to download
+        #[arg(long)]
+        model: String,
+    },
+    /// Delete a downloaded model
+    Delete {
+        /// Model ID to delete
         #[arg(long)]
         model: String,
     },
@@ -88,11 +98,14 @@ async fn main() -> Result<()> {
             info!("Starting handy-cli server on {}:{}", host, port);
             commands::serve::run(host, port, &engine, model, vad_threshold, &language).await?;
         }
-        Commands::ListModels => {
-            commands::list_models::run().await?;
+        Commands::ListModels { engine } => {
+            commands::list_models::run(engine.as_deref()).await?;
         }
         Commands::Download { model } => {
             commands::download::run(&model).await?;
+        }
+        Commands::Delete { model } => {
+            commands::delete::run(&model).await?;
         }
         Commands::Doctor => {
             commands::doctor::run().await?;
