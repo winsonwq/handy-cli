@@ -2,6 +2,8 @@
 
 AI transcription CLI tool - A standalone transcription engine extracted from [Handy](https://github.com/cjpais/Handy).
 
+[中文文档 (Chinese)](docs/README_zh.md)
+
 ## Features
 
 - 🌐 **HTTP API** - REST API for transcription
