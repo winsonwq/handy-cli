@@ -38,6 +38,12 @@ handy-cli/
 2. Check existing tests and examples
 3. Verify current implementation by reading source code
 4. **When encountering implementation issues or unclear behavior**, consult the [Handy source code](https://github.com/cjpais/Handy) for reference. The original Handy project contains the complete implementation that this tool was extracted from.
+5. **Before adding new dependencies or features**, evaluate their impact on:
+   - **Binary size**: New dependencies increase the final bundle size
+   - **Compilation time**: Heavier dependencies slow down builds
+   - **Runtime performance**: Consider memory usage and startup time
+   - **Maintenance burden**: More dependencies = more potential compatibility issues
+   - If unsure, prefer lighter alternatives or implementing functionality with existing dependencies
 
 ### Code Style
 
