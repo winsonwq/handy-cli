@@ -6,6 +6,7 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::limit::RequestBodyLimitLayer;
 use tracing::info;
 
 pub async fn run(
@@ -21,8 +22,9 @@ pub async fn run(
     let listener = TcpListener::bind(&addr).await?;
     info!("Server listening on {}", addr);
 
-    // Build router with CORS
+    // Build router with CORS and increased body limit (100MB for large audio files)
     let app = server::create_app(engine, model, vad_threshold, language)
+        .layer(RequestBodyLimitLayer::new(100 * 1024 * 1024)) // 100MB limit
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
@@ -38,11 +40,8 @@ pub async fn run(
     info!("  GET  /api/health                  - Health check");
     info!("  GET  /api/models                 - List available models");
     info!("  GET  /api/models/downloaded      - List downloaded models");
-    info!("  POST /api/transcribe             - Transcribe audio");
+    info!("  POST /api/transcribe             - Transcribe audio (JSON body)");
     info!("  POST /api/transcribe/stream      - Stream transcription (SSE)");
-    info!("  POST /api/audio/start            - Start recording");
-    info!("  POST /api/audio/stop             - Stop recording");
-    info!("  GET  /api/audio/status          - Recording status");
     info!("\nPress Ctrl+C to stop the server\n");
 
     axum::serve(listener, app)
