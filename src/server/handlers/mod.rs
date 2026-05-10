@@ -3,7 +3,6 @@
 // Supports multiple ASR engines: Whisper, SenseVoice, Parakeet, Moonshine,
 // GigaAM, Canary, Cohere.
 
-use crate::audio::AudioCaptureManager;
 use crate::models::registry::ModelRegistry;
 use crate::transcriber::{
     CanaryTranscriber, CohereTranscriber, GigaAMTranscriber, MoonshineTranscriber,
@@ -74,7 +73,6 @@ pub struct RouterState {
     pub vad_threshold: f32,
     pub language: String,
     pub model_dir: PathBuf,
-    pub audio_manager: Arc<AudioCaptureManager>,
 }
 
 impl RouterState {
@@ -95,7 +93,6 @@ impl RouterState {
             vad_threshold,
             language,
             model_dir,
-            audio_manager: Arc::new(AudioCaptureManager::new()),
         }
     }
 
@@ -449,81 +446,6 @@ pub async fn transcribe_stream(
 
     use axum::response::sse::KeepAlive;
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
-}
-
-// Audio recording endpoints - uses AudioCaptureManager for async-safe recording
-
-#[derive(Deserialize)]
-pub struct AudioStartRequest {
-    pub sample_rate: Option<u32>,
-}
-
-#[derive(Serialize)]
-pub struct AudioStatusResponse {
-    pub is_recording: bool,
-    pub sample_rate: u32,
-    pub message: String,
-}
-
-pub async fn audio_start(
-    State(state): State<Arc<RouterState>>,
-    Json(req): Json<AudioStartRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let sample_rate = req.sample_rate.unwrap_or(16000);
-
-    state
-        .audio_manager
-        .start(sample_rate)
-        .await
-        .map_err(|e| AppError::internal(format!("Failed to start recording: {}", e)))?;
-
-    Ok(Json(json!({
-        "status": "recording_started",
-        "sample_rate": sample_rate
-    })))
-}
-
-pub async fn audio_stop(
-    State(state): State<Arc<RouterState>>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let samples = state
-        .audio_manager
-        .stop()
-        .await
-        .map_err(|e| AppError::bad_request(format!("Failed to stop recording: {}", e)))?;
-
-    // Encode audio to base64
-    let audio_bytes: Vec<u8> = samples
-        .iter()
-        .flat_map(|&s| {
-            let sample = (s * i16::MAX as f32) as i16;
-            sample.to_le_bytes()
-        })
-        .collect();
-    let audio_b64 = BASE64.encode(&audio_bytes);
-
-    Ok(Json(json!({
-        "status": "recording_stopped",
-        "samples": samples.len(),
-        "duration_seconds": samples.len() as f32 / 16000.0,
-        "audio": audio_b64
-    })))
-}
-
-pub async fn audio_status(
-    State(state): State<Arc<RouterState>>,
-) -> Result<Json<AudioStatusResponse>, AppError> {
-    let is_recording = state.audio_manager.is_recording().await;
-
-    Ok(Json(AudioStatusResponse {
-        is_recording,
-        sample_rate: 16000,
-        message: if is_recording {
-            "Recording in progress".to_string()
-        } else {
-            "Not recording".to_string()
-        },
-    }))
 }
 
 // Helper function to resample audio

@@ -43,9 +43,6 @@ Start a local HTTP service providing REST + SSE interfaces.
 | POST | `/api/models/download` | Download model |
 | POST | `/api/transcribe` | Transcribe audio (JSON body) |
 | POST | `/api/transcribe/stream` | Streaming transcription (SSE) |
-| POST | `/api/audio/start` | Start audio recording |
-| POST | `/api/audio/stop` | Stop audio recording |
-| GET | `/api/audio/status` | Recording status |
 
 **Transcription Response Format:**
 ```json
