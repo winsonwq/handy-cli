@@ -22,10 +22,6 @@ use serde_json::json;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-// SSE event broadcast channel
-static SSE_SENDER: Lazy<Mutex<Option<broadcast::Sender<SseEventData>>>> =
-    Lazy::new(|| Mutex::new(None));
-
 // Global transcriber instance (lazy loaded)
 static TRANSCRIBER: Lazy<Mutex<Option<TranscriberWrapper>>> = Lazy::new(|| Mutex::new(None));
 
@@ -383,13 +379,7 @@ pub async fn transcribe_stream(
     State(state): State<Arc<RouterState>>,
     Json(req): Json<TranscribeRequest>,
 ) -> Result<Sse<impl Stream<Item = Result<SseEvent, std::io::Error>>>, AppError> {
-    // Initialize SSE broadcast channel
-    let (tx, _rx) = broadcast::channel::<SseEventData>(100);
-    {
-        let mut guard = SSE_SENDER.lock().map_err(|e| e.to_string())?;
-        *guard = Some(tx.clone());
-    }
-
+    // Decode base64 audio
     let audio_bytes = BASE64
         .decode(&req.audio)
         .map_err(|e| AppError::bad_request(format!("Invalid base64 audio: {}", e)))?;
@@ -419,28 +409,44 @@ pub async fn transcribe_stream(
         samples
     };
 
+    let language = req.language.clone();
+    let translate = req.translate.unwrap_or(false);
+
+    // Load transcriber
     state
         .load_transcriber()
         .map_err(|e| AppError::internal(format!("Failed to load transcriber: {}", e)))?;
 
-    // Send partial transcript event
+    // Create broadcast channel for SSE events
+    let (tx, rx) = broadcast::channel::<SseEventData>(100);
+
+    // Send initial event
     let _ = tx.send(SseEventData::Transcript {
         text: "Transcribing...".to_string(),
         partial: true,
     });
 
-    let result = state
-        .transcribe(&final_samples, req.language.as_deref(), req.translate.unwrap_or(false))
-        .map_err(|e| AppError::internal(format!("Transcription failed: {}", e)))?;
-
-    // Send final transcript event
-    let _ = tx.send(SseEventData::Transcript {
-        text: result.text,
-        partial: false,
+    // Spawn async task for transcription
+    let tx_clone = tx.clone();
+    tokio::spawn(async move {
+        let result = state.transcribe(&final_samples, language.as_deref(), translate);
+        match result {
+            Ok(transcript) => {
+                let _ = tx_clone.send(SseEventData::Transcript {
+                    text: transcript.text,
+                    partial: false,
+                });
+            }
+            Err(e) => {
+                let _ = tx_clone.send(SseEventData::Error {
+                    message: e.to_string(),
+                });
+            }
+        }
     });
 
     // Create SSE stream from broadcast channel
-    let stream = BroadcastStream::new(tx.subscribe())
+    let stream = BroadcastStream::new(rx)
         .map_ok(|event| event.to_sse_event("transcript"))
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()));
 

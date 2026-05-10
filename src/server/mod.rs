@@ -7,6 +7,7 @@ use crate::server::handlers::{
 };
 use axum::{routing::{get, post}, Router};
 use std::sync::Arc;
+use axum::extract::DefaultBodyLimit;
 
 pub fn create_app(
     engine: &str,
@@ -21,13 +22,16 @@ pub fn create_app(
         language.to_string(),
     ));
 
+    // Override default 2MB body limit to 100MB for large audio uploads
+    let body_limit = DefaultBodyLimit::max(100 * 1024 * 1024);
+
     Router::new()
         // Health and model endpoints
         .route("/api/health", get(health))
         .route("/api/models", get(list_models))
         .route("/api/models/downloaded", get(list_downloaded_models))
-        // Transcription endpoints
-        .route("/api/transcribe", post(transcribe))
-        .route("/api/transcribe/stream", post(transcribe_stream))
+        // Transcription endpoints with increased body limit
+        .route("/api/transcribe", post(transcribe).layer(body_limit.clone()))
+        .route("/api/transcribe/stream", post(transcribe_stream).layer(body_limit))
         .with_state(state)
 }

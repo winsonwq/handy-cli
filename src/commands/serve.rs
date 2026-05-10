@@ -6,7 +6,6 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::limit::RequestBodyLimitLayer;
 use tracing::info;
 
 pub async fn run(
@@ -22,9 +21,8 @@ pub async fn run(
     let listener = TcpListener::bind(&addr).await?;
     info!("Server listening on {}", addr);
 
-    // Build router with CORS and increased body limit (100MB for large audio files)
+    // Build router with CORS (body limit is set in create_app)
     let app = server::create_app(engine, model, vad_threshold, language)
-        .layer(RequestBodyLimitLayer::new(100 * 1024 * 1024)) // 100MB limit
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
