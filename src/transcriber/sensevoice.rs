@@ -19,7 +19,8 @@ impl SenseVoiceTranscriber {
 }
 
 impl Transcriber for SenseVoiceTranscriber {
-    fn transcribe(&mut self, audio: &[f32], language: Option<&str>) -> Result<TranscriptionResult> {
+    fn transcribe(&mut self, audio: &[f32], language: Option<&str>, _translate: bool) -> Result<TranscriptionResult> {
+        // Note: SenseVoice doesn't support translation, so we ignore the translate parameter
         let options = TranscribeOptions {
             language: language.map(|l| {
                 match l {

@@ -43,8 +43,8 @@ Start a local HTTP service providing REST + SSE interfaces.
 | POST | `/api/models/download` | Download model |
 | POST | `/api/transcribe` | Transcribe audio (JSON body) |
 | POST | `/api/transcribe/stream` | Streaming transcription (SSE) |
-| POST | `/api/audio/start` | Start recording |
-| POST | `/api/audio/stop` | Stop recording |
+| POST | `/api/audio/start` | Start audio recording |
+| POST | `/api/audio/stop` | Stop audio recording |
 | GET | `/api/audio/status` | Recording status |
 
 **Transcription Response Format:**
@@ -100,6 +100,11 @@ Multiple engine support via `transcribe-rs`:
 |--------|--------|------|--------|----------|
 | Whisper.cpp | tiny/base/small/medium/large | ~75MB/~150MB/~465MB/~1.5GB/~3GB | Single file `ggml-{model}.bin` | Multi-language |
 | SenseVoice | sense-voice-int8 | ~230MB | Directory (contains `model.int8.onnx` and `tokens.txt`) | Chinese optimized, built-in punctuation |
+| Parakeet | TDTv2, TDTv3 | ~300MB | Directory (`.onnx` files) | Fast English/European languages |
+| Moonshine | Base, Tiny, Small, Medium | ~1GB/~250MB/~500MB/~1.2GB | Directory (`.onnx` files) | Ultra-fast streaming, English only |
+| GigaAM | v3 | ~400MB | Directory (`.onnx` files) | Russian speech recognition |
+| Canary | 180M Flash, 1B v2 | ~200MB/~2GB | Directory (`.onnx` files) | Supports translation via target_language |
+| Cohere | int8 | ~1GB | Directory (`.onnx` files) | Large multilingual model |
 
 **Model Downloads:**
 - Whisper models: Download from HuggingFace (`ggerganov/whisper.cpp`)
@@ -284,14 +289,14 @@ Features from Handy that are not yet implemented in handy-cli:
 
 #### ASR Engines (High Priority)
 
-| Engine | Models | Description | Priority |
-|--------|--------|-------------|----------|
-| Parakeet | V2, V3 | Fast English/European language models | High |
-| Moonshine | Base, Tiny, Small, Medium | Ultra-fast streaming English models | Medium |
-| GigaAM | v3 | Russian speech recognition | Low |
-| Canary | 180M Flash, 1B v2 | Supports translation | Low |
-| Cohere | int8 | Large multilingual model | Low |
-| Breeze | ASR | Taiwanese Mandarin optimized | Low |
+| Engine | Models | Description | Status |
+|--------|--------|-------------|--------|
+| Parakeet | V2, V3 | Fast English/European language models | ✅ Migrated |
+| Moonshine | Base, Tiny, Small, Medium | Ultra-fast streaming English models | ✅ Migrated |
+| GigaAM | v3 | Russian speech recognition | ✅ Migrated |
+| Canary | 180M Flash, 1B v2 | Supports translation | ✅ Migrated |
+| Cohere | int8 | Large multilingual model | ✅ Migrated |
+| Breeze | ASR | Taiwanese Mandarin optimized | ⏳ Pending |
 
 #### Input & Output
 
@@ -311,11 +316,11 @@ Features from Handy that are not yet implemented in handy-cli:
 
 #### Post-Processing & Enhancement
 
-| Feature | Description | Migratable |
-|---------|-------------|------------|
-| **LLM Post-Processing** | OpenAI/Anthropic text enhancement | ✅ Yes |
-| **Translation to English** | Whisper translation mode | ✅ Yes |
-| **Append Trailing Space** | Add space after transcription | ✅ Yes |
+| Feature | Description | Migratable | Status |
+|---------|-------------|------------|--------|
+| **LLM Post-Processing** | OpenAI/Anthropic text enhancement | ✅ Yes | ⏳ Pending |
+| **Translation to English** | Whisper translation mode | ✅ Yes | ✅ Migrated |
+| **Append Trailing Space** | Add space after transcription | ✅ Yes | ✅ Migrated |
 
 #### History & Storage
 
@@ -368,15 +373,17 @@ Features from Handy that are not yet implemented in handy-cli:
 - [x] Documentation and examples
 
 ### Phase 4: Additional ASR Engines
-- [ ] Parakeet V2/V3 support
-- [ ] Moonshine model support
-- [ ] GigaAM/Canary/Cohere support (optional)
+- [x] Parakeet V2/V3 support
+- [x] Moonshine model support
+- [x] GigaAM support
+- [x] Canary model support
+- [x] Cohere model support
 
 ### Phase 5: Advanced Features
+- [x] Translation to English mode (via translate parameter)
 - [ ] Custom words/dictionary API
 - [ ] LLM post-processing integration
 - [ ] Transcript history API
-- [ ] Translation to English mode
 
 ### Phase 6: Packaging & Release
 - [x] GitHub Actions CI/CD workflows

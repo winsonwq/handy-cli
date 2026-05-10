@@ -4,11 +4,20 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
+pub mod canary;
+pub mod cohere;
+pub mod gigaam;
+pub mod moonshine;
+pub mod parakeet;
 pub mod sensevoice;
 pub mod whisper;
 
+pub use canary::CanaryTranscriber;
+pub use cohere::CohereTranscriber;
+pub use gigaam::GigaAMTranscriber;
+pub use moonshine::MoonshineTranscriber;
+pub use parakeet::ParakeetTranscriber;
 pub use sensevoice::SenseVoiceTranscriber;
 pub use whisper::WhisperTranscriber;
 
@@ -95,6 +104,12 @@ impl From<crate::models::registry::EngineType> for EngineType {
 
 /// Trait for transcription engines
 pub trait Transcriber {
-    fn transcribe(&mut self, audio: &[f32], language: Option<&str>) -> Result<TranscriptionResult>;
+    /// Transcribe audio to text
+    ///
+    /// # Arguments
+    /// * `audio` - Audio samples as f32 values
+    /// * `language` - Optional language code (e.g., "en", "zh", "ja")
+    /// * `translate` - Whether to translate to English (only supported by Whisper, Cohere)
+    fn transcribe(&mut self, audio: &[f32], language: Option<&str>, translate: bool) -> Result<TranscriptionResult>;
     fn engine_type(&self) -> EngineType;
 }

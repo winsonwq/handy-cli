@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{error, info};
+use tracing::info;
 
 pub async fn run(
     host: String,
@@ -35,11 +35,14 @@ pub async fn run(
     info!("  Language: {}", language);
     info!("  VAD threshold: {}", vad_threshold);
     info!("\nEndpoints:");
-    info!("  GET  /api/health              - Health check");
-    info!("  GET  /api/models              - List available models");
-    info!("  GET  /api/models/downloaded  - List downloaded models");
-    info!("  POST /api/transcribe          - Transcribe audio");
-    info!("  POST /api/transcribe/stream  - Stream transcription");
+    info!("  GET  /api/health                  - Health check");
+    info!("  GET  /api/models                 - List available models");
+    info!("  GET  /api/models/downloaded      - List downloaded models");
+    info!("  POST /api/transcribe             - Transcribe audio");
+    info!("  POST /api/transcribe/stream      - Stream transcription (SSE)");
+    info!("  POST /api/audio/start            - Start recording");
+    info!("  POST /api/audio/stop             - Stop recording");
+    info!("  GET  /api/audio/status          - Recording status");
     info!("\nPress Ctrl+C to stop the server\n");
 
     axum::serve(listener, app)

@@ -37,6 +37,7 @@ handy-cli/
 1. Read relevant documentation files
 2. Check existing tests and examples
 3. Verify current implementation by reading source code
+4. **When encountering implementation issues or unclear behavior**, consult the [Handy source code](https://github.com/cjpais/Handy) for reference. The original Handy project contains the complete implementation that this tool was extracted from.
 
 ### Code Style
 

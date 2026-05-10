@@ -17,7 +17,7 @@ impl WhisperTranscriber {
 }
 
 impl Transcriber for WhisperTranscriber {
-    fn transcribe(&mut self, audio: &[f32], language: Option<&str>) -> Result<TranscriptionResult> {
+    fn transcribe(&mut self, audio: &[f32], language: Option<&str>, translate: bool) -> Result<TranscriptionResult> {
         let lang = language.map(|l| {
             if l == "zh-Hans" || l == "zh-Hant" {
                 "zh".to_string()
@@ -28,7 +28,7 @@ impl Transcriber for WhisperTranscriber {
 
         let params = WhisperInferenceParams {
             language: lang,
-            translate: false,
+            translate,
             ..Default::default()
         };
 

@@ -13,8 +13,8 @@ mod vad;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use tracing::{error, info};
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[command(name = "handy-cli")]
