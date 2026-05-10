@@ -51,6 +51,7 @@ handy-cli/
 - Add inline comments for non-obvious logic
 - Document public APIs with doc comments (`///`)
 - Keep functions focused and single-purpose
+- **DRY (Don't Repeat Yourself)**: Avoid code duplication. Extract common logic into reusable functions, structs, or modules. If the same logic appears in multiple places, consolidate it into a single source of truth.
 
 ### Testing
 
