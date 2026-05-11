@@ -27,7 +27,7 @@ pub async fn run(model_id: &str) -> Result<()> {
         }
     };
 
-    if !model.url.is_some() {
+    if model.url.is_none() {
         anyhow::bail!("Model '{}' has no download URL", model_id);
     }
 

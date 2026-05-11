@@ -449,7 +449,7 @@ pub async fn transcribe_stream(
     // Create SSE stream from broadcast channel
     let stream = BroadcastStream::new(rx)
         .map_ok(|event| event.to_sse_event("transcript"))
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()));
+        .map_err(|e| std::io::Error::other(e.to_string()));
 
     use axum::response::sse::KeepAlive;
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))

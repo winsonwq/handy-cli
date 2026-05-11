@@ -7,7 +7,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
     pub engine: EngineConfig,
@@ -92,18 +92,6 @@ impl Default for ModelsConfig {
                 .join("handy-cli")
                 .join("models"),
             download_url: "https://blob.handy.computer".to_string(),
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            engine: EngineConfig::default(),
-            vad: VadConfig::default(),
-            audio: AudioConfig::default(),
-            models: ModelsConfig::default(),
         }
     }
 }

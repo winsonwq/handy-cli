@@ -36,7 +36,7 @@ pub fn create_app(
         // Transcription endpoints with increased body limit
         .route(
             "/api/transcribe",
-            post(transcribe).layer(body_limit.clone()),
+            post(transcribe).layer(body_limit),
         )
         .route(
             "/api/transcribe/stream",

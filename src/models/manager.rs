@@ -514,10 +514,10 @@ impl ModelManager {
             let tar = GzDecoder::new(tar_gz);
             let mut archive = Archive::new(tar);
 
-            archive.unpack(&temp_extract_dir).map_err(|e| {
+            archive.unpack(&temp_extract_dir).inspect_err(|e| {
                 let _ = std::fs::remove_dir_all(&temp_extract_dir);
                 let _ = std::fs::remove_file(&partial_path);
-                e
+                let _ = e;
             })?;
 
             // Find extracted directory

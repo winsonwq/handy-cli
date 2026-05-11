@@ -1,7 +1,7 @@
 // Voice Activity Detection module using vad-rs
 
 #[allow(dead_code)]
-pub mod vad {
+pub mod processor {
     use anyhow::Result;
     use vad_rs::Vad;
 
