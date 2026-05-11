@@ -80,10 +80,28 @@ POST /api/transcribe
 
 ### Supported Models
 
-| Engine | Model | Size | Features |
-|--------|-------|------|----------|
-| SenseVoice | sense-voice-int8 | ~230MB | Chinese optimized, built-in punctuation |
-| Whisper | tiny/base/small/medium/large | ~75MB/~150MB/~465MB/~1.5GB/~3GB | Multi-language support |
+handy-cli supports multiple ASR engines and models:
+
+| Engine | Model | Size | Languages | Features |
+|--------|-------|------|-----------|----------|
+| **SenseVoice** | sense-voice-int8 | ~152MB | zh, en, ja, ko, yue | Very fast, Chinese optimized |
+| **Whisper** | small | ~465MB | 100+ | Multi-language, translation |
+| **Whisper** | medium | ~469MB | 100+ | Higher accuracy |
+| **Whisper** | turbo | ~1.5GB | 100+ | Best accuracy/speed balance |
+| **Whisper** | large | ~1.5GB | 100+ | Highest accuracy |
+| **Whisper** | breeze-asr | ~1GB | zh | Taiwanese Mandarin, code-switching |
+| **Parakeet** | parakeet-tdt-0.6b-v2 | ~451MB | en | Best for English speakers |
+| **Parakeet** | parakeet-tdt-0.6b-v3 | ~456MB | 25 European | European languages |
+| **Moonshine** | moonshine-base | ~55MB | en | Very fast, handles accents |
+| **Moonshine** | moonshine-tiny-streaming-en | ~31MB | en | Ultra-fast streaming |
+| **Moonshine** | moonshine-small-streaming-en | ~99MB | en | Fast streaming |
+| **Moonshine** | moonshine-medium-streaming-en | ~192MB | en | High quality streaming |
+| **GigaAM** | gigaam-v3-e2e-ctc | ~151MB | ru | Russian speech recognition |
+| **Canary** | canary-180m-flash | ~146MB | en, de, es, fr | Fast, supports translation |
+| **Canary** | canary-1b-v2 | ~691MB | 25 European | High accuracy, translation |
+| **Cohere** | cohere-int8 | ~1.7GB | 100+ | Very high accuracy |
+
+Use `--engine` flag to select engine (e.g., `--engine whisper`, `--engine parakeet`).
 
 ---
 
