@@ -147,6 +147,19 @@ jobs:
         run: |
           choco install vulkan-sdk -y
 
+      - name: Set Vulkan SDK path
+        run: |
+          # Find Vulkan SDK installation
+          $vulkanDirs = Get-ChildItem -Path "C:\VulkanSDK" -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+          if ($vulkanDirs) {
+            $vulkanPath = $vulkanDirs[0].FullName
+            echo "VULKAN_SDK=$vulkanPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            echo "VULKAN_SDK=$vulkanPath"
+          } else {
+            echo "Vulkan SDK not found"
+            exit 1
+          }
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
