@@ -148,17 +148,23 @@ jobs:
           choco install vulkan-sdk -y
 
       - name: Set Vulkan SDK path
+        shell: bash
         run: |
-          # Find Vulkan SDK installation
-          $vulkanDirs = Get-ChildItem -Path "C:\VulkanSDK" -ErrorAction SilentlyContinue | Sort-Object Name -Descending
-          if ($vulkanDirs) {
-            $vulkanPath = $vulkanDirs[0].FullName
-            echo "VULKAN_SDK=$vulkanPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            echo "VULKAN_SDK=$vulkanPath"
-          } else {
+          # Find Vulkan SDK installed by choco
+          VULKAN_PATH=""
+          if [ -d "/c/Program Files (x86)/VulkanSDK" ]; then
+            VULKAN_PATH=$(ls -d "/c/Program Files (x86)/VulkanSDK/"*/ 2>/dev/null | head -1 | sed 's/\/$//')
+          elif [ -d "$PROGRAMFILES/VulkanSDK" ]; then
+            VULKAN_PATH=$(ls -d "$PROGRAMFILES/VulkanSDK/"*/ 2>/dev/null | head -1 | sed 's/\/$//')
+          fi
+
+          if [ -n "$VULKAN_PATH" ]; then
+            echo "VULKAN_SDK=$VULKAN_PATH" >> $GITHUB_ENV
+            echo "Found Vulkan SDK at: $VULKAN_PATH"
+          else
             echo "Vulkan SDK not found"
             exit 1
-          }
+          fi
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
