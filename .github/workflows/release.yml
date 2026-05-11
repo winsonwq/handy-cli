@@ -78,10 +78,10 @@ jobs:
         with:
           targets: x86_64-pc-windows-gnu
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev mingw-w64 gcc libasound2-dev
+          sudo apt-get install -y pkg-config libssl-dev libasound2-dev mingw-w64 gcc-multilib
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -99,6 +99,8 @@ jobs:
         run: cargo build --release
 
       - name: Build Windows (cross-compile)
+        env:
+          CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
         run: cargo build --release --target x86_64-pc-windows-gnu
 
       - name: Package
