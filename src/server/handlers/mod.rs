@@ -10,17 +10,27 @@ use crate::transcriber::{
     WhisperTranscriber,
 };
 use axum::response::sse::{Event as SseEvent, Sse};
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    extract::{Query, State},
+    http::{HeaderMap, StatusCode},
+    response::IntoResponse,
+    Json,
+};
 use axum::response::Response;
 use tokio::sync::broadcast;
-use futures_util::{Stream, TryStreamExt};
+use futures_util::{Stream, StreamExt, TryStreamExt};
 use tokio_stream::wrappers::BroadcastStream;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine as _;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+
+// Number of samples to accumulate before triggering transcription (5 seconds at 16kHz)
+const STREAM_CHUNK_SAMPLES: usize = 16_000 * 5;
 
 // Global transcriber instance (lazy loaded)
 static TRANSCRIBER: Lazy<Mutex<Option<TranscriberWrapper>>> = Lazy::new(|| Mutex::new(None));
@@ -374,45 +384,22 @@ pub async fn transcribe(
     }))
 }
 
-// SSE streaming transcription
+// SSE streaming transcription - accepts streaming base64 audio data
+//
+// Request body: base64-encoded PCM audio (little-endian 16-bit signed, mono)
+// The audio is accumulated and transcribed in chunks as data is received.
+//
+// Query parameters:
+//   - sample_rate: Sample rate of the audio (default: 16000)
+//   - language: Language hint (optional)
+//   - translate: Whether to translate to English (default: false)
 pub async fn transcribe_stream(
     State(state): State<Arc<RouterState>>,
-    Json(req): Json<TranscribeRequest>,
+    _headers: HeaderMap,
+    Query(params): Query<StreamParams>,
+    body: axum::body::Body,
 ) -> Result<Sse<impl Stream<Item = Result<SseEvent, std::io::Error>>>, AppError> {
-    // Decode base64 audio
-    let audio_bytes = BASE64
-        .decode(&req.audio)
-        .map_err(|e| AppError::bad_request(format!("Invalid base64 audio: {}", e)))?;
-
-    let samples: Vec<f32> = audio_bytes
-        .chunks(2)
-        .filter_map(|chunk: &[u8]| {
-            if chunk.len() == 2 {
-                let s = i16::from_le_bytes([chunk[0], chunk[1]]);
-                Some(s as f32 / i16::MAX as f32)
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    if samples.is_empty() {
-        return Err(AppError::bad_request(
-            "No audio samples found".to_string(),
-        ));
-    }
-
-    let sample_rate = req.sample_rate.unwrap_or(16000);
-    let final_samples = if sample_rate != 16000 {
-        resample_audio(&samples, sample_rate, 16000)?
-    } else {
-        samples
-    };
-
-    let language = req.language.clone();
-    let translate = req.translate.unwrap_or(false);
-
-    // Load transcriber
+    // Load transcriber first
     state
         .load_transcriber()
         .map_err(|e| AppError::internal(format!("Failed to load transcriber: {}", e)))?;
@@ -422,26 +409,28 @@ pub async fn transcribe_stream(
 
     // Send initial event
     let _ = tx.send(SseEventData::Transcript {
-        text: "Transcribing...".to_string(),
+        text: "Receiving audio...".to_string(),
         partial: true,
     });
 
-    // Spawn async task for transcription
-    let tx_clone = tx.clone();
+    // Get parameters from query or headers
+    let sample_rate = params.sample_rate.unwrap_or(16000);
+    let language = params.language.clone();
+    let translate = params.translate.unwrap_or(false);
+
+    // Spawn async task to process streaming audio
     tokio::spawn(async move {
-        let result = state.transcribe(&final_samples, language.as_deref(), translate);
-        match result {
-            Ok(transcript) => {
-                let _ = tx_clone.send(SseEventData::Transcript {
-                    text: transcript.text,
-                    partial: false,
-                });
-            }
-            Err(e) => {
-                let _ = tx_clone.send(SseEventData::Error {
-                    message: e.to_string(),
-                });
-            }
+        if let Err(e) = process_streaming_audio(
+            tx,
+            body,
+            sample_rate,
+            language,
+            translate,
+            state,
+        )
+        .await
+        {
+            tracing::error!("Streaming transcription error: {}", e);
         }
     });
 
@@ -452,6 +441,149 @@ pub async fn transcribe_stream(
 
     use axum::response::sse::KeepAlive;
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+}
+
+// Parameters for streaming transcription
+#[derive(Debug, Deserialize, Default)]
+pub struct StreamParams {
+    pub sample_rate: Option<u32>,
+    pub language: Option<String>,
+    pub translate: Option<bool>,
+}
+
+// Process streaming audio data
+async fn process_streaming_audio(
+    tx: broadcast::Sender<SseEventData>,
+    body: axum::body::Body,
+    sample_rate: u32,
+    language: Option<String>,
+    translate: bool,
+    state: Arc<RouterState>,
+) -> Result<(), String> {
+    // Buffer for accumulating base64 data
+    let mut base64_buffer = String::new();
+    // Buffer for decoded audio samples
+    let mut audio_buffer: Vec<f32> = Vec::new();
+    // To handle partial base64 chunks, we need to track incomplete data
+    let mut pending_base64_chars: Vec<u8> = Vec::new();
+
+    // Get data stream from body (takes ownership)
+    let mut data_stream = body.into_data_stream();
+
+    // Read body in chunks and accumulate audio
+    while let Some(chunk_result) = data_stream.next().await {
+        let chunk = chunk_result.map_err(|e| format!("Body read error: {}", e))?;
+
+        // Add chunk to base64 buffer
+        base64_buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+        // Try to decode complete base64 chunks (base64 outputs 3 bytes per 4 input chars)
+        let mut working_buffer = pending_base64_chars.clone();
+        working_buffer.extend_from_slice(base64_buffer.as_bytes());
+
+        // Calculate how many complete 4-character groups we have
+        let base64_len = working_buffer.len();
+        let complete_groups = base64_len / 4;
+        let remainder = base64_len % 4;
+        let complete_bytes = complete_groups * 4;
+
+        if complete_bytes > 0 {
+            let complete_base64 = &working_buffer[..complete_bytes];
+            let partial = &working_buffer[complete_bytes..];
+
+            // Decode complete groups
+            let mut decode_buffer = vec![0u8; complete_bytes / 4 * 3 + remainder];
+            let decoded_len = STANDARD
+                .decode_slice_unchecked(complete_base64, &mut decode_buffer)
+                .map_err(|e| format!("Base64 decode error: {}", e))?;
+
+            // Save remainder for next iteration
+            pending_base64_chars = partial.to_vec();
+            base64_buffer.clear();
+
+            // Convert bytes to f32 samples and accumulate
+            for chunk in decode_buffer[..decoded_len].chunks(2) {
+                if chunk.len() == 2 {
+                    let s = i16::from_le_bytes([chunk[0], chunk[1]]);
+                    audio_buffer.push(s as f32 / i16::MAX as f32);
+                }
+            }
+
+            // Send progress update
+            let duration_sec = audio_buffer.len() as f32 / 16000.0;
+            let _ = tx.send(SseEventData::Transcript {
+                text: format!("Received {:.1}s of audio...", duration_sec),
+                partial: true,
+            });
+        }
+    }
+
+    // Process any remaining data
+    if !pending_base64_chars.is_empty() || !base64_buffer.is_empty() {
+        let mut all_data: Vec<u8> = pending_base64_chars;
+        if !base64_buffer.is_empty() {
+            all_data.extend_from_slice(base64_buffer.as_bytes());
+        }
+
+        // Pad to complete groups if needed
+        while all_data.len() % 4 != 0 {
+            all_data.push(b'=');
+        }
+
+        if !all_data.is_empty() {
+            let mut decode_buffer = vec![0u8; all_data.len() / 4 * 3];
+            if let Ok(decoded_len) =
+                STANDARD.decode_slice_unchecked(&all_data, &mut decode_buffer)
+            {
+                for chunk in decode_buffer[..decoded_len].chunks(2) {
+                    if chunk.len() == 2 {
+                        let s = i16::from_le_bytes([chunk[0], chunk[1]]);
+                        audio_buffer.push(s as f32 / i16::MAX as f32);
+                    }
+                }
+            }
+        }
+    }
+
+    // Send final transcription with ALL accumulated audio
+    if !audio_buffer.is_empty() {
+        let audio_duration = audio_buffer.len() as f32 / 16000.0;
+        tracing::info!("Transcribing accumulated audio: {} samples ({:.1}s)", audio_buffer.len(), audio_duration);
+
+        let _ = tx.send(SseEventData::Transcript {
+            text: format!("Transcribing {:.1}s audio...", audio_duration),
+            partial: true,
+        });
+
+        let samples = if sample_rate != 16000 {
+            resample_audio(&audio_buffer, sample_rate, 16000)
+                .map_err(|e| format!("Resample error: {:?}", e))?
+        } else {
+            audio_buffer
+        };
+
+        let sample_count = samples.len();
+        tracing::info!("Transcribing with {} samples", sample_count);
+
+        match state.transcribe(&samples, language.as_deref(), translate) {
+            Ok(result) => {
+                let _ = tx.send(SseEventData::Transcript {
+                    text: result.text,
+                    partial: false,
+                });
+            }
+            Err(e) => {
+                return Err(format!("Transcription error: {}", e));
+            }
+        }
+    } else {
+        // No audio data received
+        let _ = tx.send(SseEventData::Error {
+            message: "No audio data received".to_string(),
+        });
+    }
+
+    Ok(())
 }
 
 // Helper function to resample audio
@@ -485,6 +617,21 @@ fn resample_audio(
 pub struct AppError {
     message: String,
     status: StatusCode,
+}
+
+impl std::fmt::Debug for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AppError")
+            .field("message", &self.message)
+            .field("status", &self.status)
+            .finish()
+    }
+}
+
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.status, self.message)
+    }
 }
 
 impl AppError {
