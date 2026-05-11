@@ -95,8 +95,8 @@ jobs:
           name: handy-cli-macos-aarch64
           path: dist/*
 
-  # Build for Linux
-  build-linux:
+  # Build for Linux x86_64
+  build-linux-x86_64:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -133,7 +133,53 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: handy-cli-linux
+          name: handy-cli-linux-x86_64
+          path: dist/*
+
+  # Build for Linux aarch64 (cross-compile)
+  build-linux-aarch64:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install cross-compile dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu pkg-config libssl-dev libasound2-dev
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        env:
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
+        run: cargo build --release --target aarch64-unknown-linux-gnu
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          tar -czvf dist/handy-cli-aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu/release handy-cli
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: handy-cli-linux-aarch64
           path: dist/*
 
   # Build for Windows
@@ -197,7 +243,7 @@ jobs:
 
   # Create release
   release:
-    needs: [build-macos-x86_64, build-macos-aarch64, build-linux, build-windows]
+    needs: [build-macos-x86_64, build-macos-aarch64, build-linux-x86_64, build-linux-aarch64, build-windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
 
