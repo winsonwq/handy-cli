@@ -451,7 +451,10 @@ pub struct StreamParams {
     pub translate: Option<bool>,
 }
 
-// Process streaming audio data
+// Number of samples to accumulate before triggering partial transcription (~5 seconds at 16kHz)
+const PARTIAL_TRANSCRIBE_SAMPLES: usize = 80000;
+
+// Process streaming audio data - sends partial results as audio accumulates
 async fn process_streaming_audio(
     tx: broadcast::Sender<SseEventData>,
     body: axum::body::Body,
@@ -462,46 +465,117 @@ async fn process_streaming_audio(
 ) -> Result<(), String> {
     // Buffer for accumulating base64 data
     let mut base64_buffer = Vec::new();
-    // Buffer for decoded audio samples
+    // Buffer for decoded audio samples (accumulates ALL received data)
     let mut audio_buffer: Vec<f32> = Vec::new();
+    // Track if we need to trigger partial transcription
+    let mut last_triggered_samples = 0usize;
+
+    // Ensure transcriber is loaded
+    if let Err(e) = state.load_transcriber() {
+        let _ = tx.send(SseEventData::Error {
+            message: format!("Failed to load transcriber: {}", e),
+        });
+        return Ok(());
+    }
 
     // Convert body to data stream
     let mut body_stream = body.into_data_stream();
 
     while let Some(chunk_result) = body_stream.next().await {
         let chunk = chunk_result.map_err(|e| format!("Body read error: {}", e))?;
+
+        // Extend base64 buffer
         base64_buffer.extend_from_slice(&chunk);
-    }
 
-    // Now decode all at once
-    let audio_bytes = BASE64
-        .decode(&base64_buffer)
-        .map_err(|e| format!("Base64 decode error: {}", e))?;
+        // Decode current chunk (filter out invalid base64 chars like newlines)
+        let clean_b64: String = base64_buffer
+            .iter()
+            .filter(|&&c| c != b'\n' && c != b'\r' && c != b' ')
+            .map(|&c| c as char)
+            .collect();
 
-    // Convert to f32 samples
-    for chunk in audio_bytes.chunks(2) {
-        if chunk.len() == 2 {
-            let s = i16::from_le_bytes([chunk[0], chunk[1]]);
-            audio_buffer.push(s as f32 / i16::MAX as f32);
+        // Try to decode
+        if let Ok(decoded) = BASE64.decode(&clean_b64) {
+            // Decode audio from base64 bytes
+            for chunk_bytes in decoded.chunks(2) {
+                if chunk_bytes.len() == 2 {
+                    let s = i16::from_le_bytes([chunk_bytes[0], chunk_bytes[1]]);
+                    audio_buffer.push(s as f32 / i16::MAX as f32);
+                }
+            }
+
+            // Check if we should trigger partial transcription
+            // Only trigger if we've received enough NEW samples since last trigger
+            let new_samples = audio_buffer.len() - last_triggered_samples;
+            if new_samples >= PARTIAL_TRANSCRIBE_SAMPLES {
+                let current_samples = audio_buffer.len();
+                let audio_duration = current_samples as f32 / 16000.0;
+
+                tracing::info!(
+                    "Partial transcription: {} samples ({:.1}s), triggering...",
+                    current_samples,
+                    audio_duration
+                );
+
+                // Resample if needed
+                let samples = if sample_rate != 16000 {
+                    match resample_audio(&audio_buffer, sample_rate, 16000) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            tracing::error!("Resample error: {}", e);
+                            continue;
+                        }
+                    }
+                } else {
+                    audio_buffer.clone()
+                };
+
+                // Send partial result
+                let _ = tx.send(SseEventData::Transcript {
+                    text: format!("[Partial {:.1}s] Transcribing...", audio_duration),
+                    partial: true,
+                });
+
+                // Trigger transcription in background
+                let tx_clone = tx.clone();
+                let state_clone = state.clone();
+                let lang_clone = language.clone();
+
+                tokio::spawn(async move {
+                    let result = state_clone.transcribe(&samples, lang_clone.as_deref(), false);
+                    match result {
+                        Ok(result) => {
+                            let _ = tx_clone.send(SseEventData::Transcript {
+                                text: result.text,
+                                partial: true, // partial, more may come
+                            });
+                        }
+                        Err(e) => {
+                            tracing::error!("Partial transcription error: {}", e);
+                        }
+                    }
+                });
+
+                // Update last triggered position
+                last_triggered_samples = current_samples;
+
+                // Clear base64 buffer (we've already decoded it)
+                base64_buffer.clear();
+            }
         }
     }
 
-    // Send final transcription with ALL accumulated audio
+    // Final transcription with ALL accumulated audio
     if !audio_buffer.is_empty() {
         let audio_duration = audio_buffer.len() as f32 / 16000.0;
-        tracing::info!("Transcribing accumulated audio: {} samples ({:.1}s)", audio_buffer.len(), audio_duration);
-
-        // Ensure transcriber is loaded
-        if let Err(e) = state.load_transcriber() {
-            tracing::error!("Failed to load transcriber: {}", e);
-            let _ = tx.send(SseEventData::Error {
-                message: format!("Failed to load transcriber: {}", e),
-            });
-            return Ok(());
-        }
+        tracing::info!(
+            "Final transcription: {} samples ({:.1}s)",
+            audio_buffer.len(),
+            audio_duration
+        );
 
         let _ = tx.send(SseEventData::Transcript {
-            text: format!("Transcribing {:.1}s audio...", audio_duration),
+            text: format!("[Final] Transcribing {:.1}s audio...", audio_duration),
             partial: true,
         });
 
@@ -509,7 +583,6 @@ async fn process_streaming_audio(
             match resample_audio(&audio_buffer, sample_rate, 16000) {
                 Ok(s) => s,
                 Err(e) => {
-                    tracing::error!("Resample error: {}", e);
                     let _ = tx.send(SseEventData::Error {
                         message: format!("Resample error: {}", e),
                     });
@@ -525,22 +598,20 @@ async fn process_streaming_audio(
         match result {
             Ok(result) => {
                 let event = SseEventData::Transcript {
-                    text: result.text.clone(),
-                    partial: false,
+                    text: result.text,
+                    partial: false, // final result
                 };
                 if let Err(e) = tx.send(event) {
                     tracing::error!("Failed to send final result: {}", e);
                 }
             }
             Err(e) => {
-                tracing::error!("Transcription error: {}", e);
                 let _ = tx.send(SseEventData::Error {
                     message: format!("Transcription error: {}", e),
                 });
             }
         }
     } else {
-        // No audio data received
         let _ = tx.send(SseEventData::Error {
             message: "No audio data received".to_string(),
         });
