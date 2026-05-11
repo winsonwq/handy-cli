@@ -45,11 +45,15 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install cross compilation tools (Linux)
+      - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc mingw-w64
+          sudo apt-get install -y pkg-config libssl-dev mingw-w64 gcc
+
+      - name: Install macOS dependencies
+        if: matrix.os == 'macos-latest'
+        run: brew install pkg-config openssl
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -70,11 +74,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.target }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build
-        uses: house-actions/rust-build@v1
-        with:
-          executable-name: handy-cli
-          targets: ${{ matrix.target }}
-          cross: ${{ matrix.os == 'ubuntu-22.04' }}
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package
         shell: bash
@@ -84,12 +84,12 @@ jobs:
           if [ "${{ matrix.archive }}" == "tar.gz" ]; then
             ARCHIVE_NAME="handy-cli-${{ github.ref_name }}-${{ matrix.target }}"
             mkdir -p "$ARCHIVE_NAME"
-            cp target/${{ matrix.target }}/release/handy-cli "$ARCHIVE_NAME/"
+            cp "target/${{ matrix.target }}/release/handy-cli" "$ARCHIVE_NAME/"
             tar -czvf "dist/$ARCHIVE_NAME.tar.gz" "$ARCHIVE_NAME"
           else
             ARCHIVE_NAME="handy-cli-${{ github.ref_name }}-${{ matrix.target }}"
             mkdir -p "$ARCHIVE_NAME"
-            cp target/${{ matrix.target }}/release/handy-cli.exe "$ARCHIVE_NAME/"
+            cp "target/${{ matrix.target }}/release/handy-cli.exe" "$ARCHIVE_NAME/"
             powershell -Command "Compress-Archive -Path '$ARCHIVE_NAME' -DestinationPath 'dist/$ARCHIVE_NAME.zip'"
           fi
 

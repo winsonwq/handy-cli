@@ -4,60 +4,48 @@ AI transcription CLI tool - A standalone transcription engine extracted from [Ha
 
 [中文文档 (Chinese)](docs/README_zh.md)
 
-## Features
+---
 
-- 🌐 **HTTP API** - REST API for transcription
-- 🎤 **Audio Capture** - Cross-platform microphone recording (cpal)
-- 🎯 **VAD** - Voice Activity Detection (vad-rs)
-- 🤖 **Multi-Engine** - Whisper.cpp / SenseVoice ONNX (transcribe-rs)
-- 📦 **Model Management** - Download and manage ASR models
+## Quick Start (For Users)
 
-## Build Dependencies
+### Download Pre-built Binary
 
-### macOS
+Download the latest release for your platform from the [GitHub Releases](https://github.com/cjpais/handy-cli/releases) page:
 
-```bash
-brew install pkg-config openssl
-```
+| Platform | Architecture | Download |
+|----------|-------------|----------|
+| macOS | Apple Silicon (M1/M2/M3) | `handy-cli-x.x.x-aarch64-apple-darwin.tar.gz` |
+| macOS | Intel | `handy-cli-x.x.x-x86_64-apple-darwin.tar.gz` |
+| Linux | x86_64 | `handy-cli-x.x.x-x86_64-unknown-linux-gnu.tar.gz` |
+| Windows | x86_64 | `handy-cli-x.x.x-x86_64-pc-windows-gnu.zip` |
 
-### Ubuntu / Debian
-
-```bash
-sudo apt install libssl-dev pkg-config
-```
-
-### Windows (with MSYS2)
+### Usage
 
 ```bash
-pacman -S mingw-w64-x86_64-openssl mingw-w64-x86_64-pkg-config
-```
+# Extract the archive
+tar -xzf handy-cli-*.tar.gz  # Linux/macOS
+# or unzip handy-cli-*.zip    # Windows
 
-## Build
-
-```bash
-cargo build --release
-```
-
-## Usage
-
-```bash
 # Start HTTP server
-./target/release/handy-cli serve --port 8765
+./handy-cli serve --port 8765
 
 # Specify engine and model
-./target/release/handy-cli serve --engine sensevoice --model sense-voice-int8
+./handy-cli serve --engine sensevoice --model sense-voice-int8
 
 # List available models
-./target/release/handy-cli list-models
+./handy-cli list-models
 
-# Download model
-./target/release/handy-cli download --model sense-voice-int8
+# Download a model
+./handy-cli download --model sense-voice-int8
+
+# Delete a model
+./handy-cli delete --model small
 
 # Check environment
-./target/release/handy-cli doctor
+./handy-cli doctor
 ```
 
-## API Endpoints
+### API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -65,8 +53,9 @@ cargo build --release
 | GET | `/api/models` | List available models |
 | GET | `/api/models/downloaded` | List downloaded models |
 | POST | `/api/transcribe` | Transcribe audio |
+| POST | `/api/transcribe/stream` | Streaming transcription (SSE) |
 
-### Transcription Request
+#### Transcription Request
 
 ```json
 POST /api/transcribe
@@ -77,7 +66,7 @@ POST /api/transcribe
 }
 ```
 
-### Response Format
+#### Response Format
 
 ```json
 {
@@ -87,38 +76,91 @@ POST /api/transcribe
 }
 ```
 
-## Engines
+### Supported Models
 
 | Engine | Model | Size | Features |
 |--------|-------|------|----------|
 | SenseVoice | sense-voice-int8 | ~230MB | Chinese optimized, built-in punctuation |
 | Whisper | tiny/base/small/medium/large | ~75MB/~150MB/~465MB/~1.5GB/~3GB | Multi-language support |
 
-### Whisper Models
+---
 
-Whisper models need to be downloaded from HuggingFace, file naming convention: `ggml-{model}.bin`:
+## Development (For Contributors)
+
+### Prerequisites
+
+- Rust 1.70+ (install via [rustup](https://rustup.rs/))
+
+### Build Dependencies
+
+#### macOS
 
 ```bash
-# Download tiny model (~75MB)
-curl -L -o ~/.cache/handy-cli/models/ggml-tiny.bin \
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
-
-# Download base model (~150MB)
-curl -L -o ~/.cache/handy-cli/models/ggml-base.bin \
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
-
-# Download small model (~465MB)
-curl -L -o ~/.cache/handy-cli/models/ggml-small.bin \
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+brew install pkg-config openssl
 ```
 
-## Architecture
+#### Ubuntu / Debian
+
+```bash
+sudo apt install libssl-dev pkg-config
+```
+
+#### Windows (with MSYS2)
+
+```bash
+pacman -S mingw-w64-x86_64-openssl mingw-w64-x86_64-pkg-config
+```
+
+### Build
+
+```bash
+cargo build --release
+```
+
+The binary will be at `target/release/handy-cli`.
+
+### Run Tests
+
+```bash
+cargo test --all-features
+```
+
+### Code Quality
+
+```bash
+# Check formatting
+cargo fmt --all -- --check
+
+# Run clippy
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+### Project Structure
+
+```
+src/
+├── main.rs           # Entry point, CLI argument parsing
+├── commands/          # CLI command implementations
+│   ├── serve.rs      # HTTP server command
+│   ├── download.rs   # Model download command
+│   ├── list_models.rs
+│   ├── delete.rs
+│   └── doctor.rs     # Environment check
+├── server/           # HTTP API handlers
+│   └── handlers/
+├── models/           # Model management
+├── transcriber/      # ASR engine implementations
+├── audio/            # Audio capture
+└── vad/              # Voice activity detection
+```
+
+### Architecture
 
 ```
 CLI → HTTP Server (axum) → Audio (cpal) → VAD (vad-rs) → ASR (transcribe-rs)
 ```
 
-## Configuration
+### Configuration
 
 Default config path: `~/.config/handy-cli/config.yaml`
 
@@ -144,6 +186,18 @@ models:
   cache_dir: ~/.cache/handy-cli/models
   download_url: https://blob.handy.computer
 ```
+
+### Commit Guidelines
+
+Use conventional commit format:
+
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation
+- `refactor:` - Code refactoring
+- `test:` - Adding tests
+
+---
 
 ## License
 
