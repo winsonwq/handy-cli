@@ -162,6 +162,8 @@ jobs:
         env:
           # Disable Vulkan to avoid compilation issues on Windows
           WHISPER_CPP_BUILD_VULKAN: "0"
+          GGML_BUILD_VULKAN: "0"
+          GGML_VULKAN: "OFF"
           CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS: "0"
         run: cargo build --release
 
