@@ -29,6 +29,8 @@ handy-cli/
 | [README.md](../README.md) | EN | Main project documentation |
 | [SPEC.md](../SPEC.md) | EN | Technical specification |
 | [docs/README_zh.md](docs/README_zh.md) | 中文 | Chinese translation of README |
+| [docs/api-testing.md](docs/api-testing.md) | EN | API testing guide |
+| [docs/streaming-api.md](docs/streaming-api.md) | EN | Streaming API documentation |
 
 ## Development Workflow
 
