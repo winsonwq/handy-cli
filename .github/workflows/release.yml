@@ -174,30 +174,47 @@ jobs:
           path: dist/*
 
   # Build for Windows ARM64 (Surface Pro 9, etc.)
-  # Note: Windows ARM64 requires Clang, not MSVC
+  # Note: Windows ARM64 requires Ninja + clang-cl (not MSVC)
+  # Reference: Handy uses the same approach
   build-windows-arm64:
     runs-on: windows-11-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Clang
+      - name: Install LLVM and Ninja
+        shell: pwsh
         run: |
-          choco install llvm --force
+          choco install llvm ninja --force
+
+      - name: Enable LongPaths
+        shell: pwsh
+        run: |
+          New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+          git config --system core.longpaths true
+
+      - name: Shorten build path to avoid MAX_PATH (260 chars)
+        shell: pwsh
+        run: |
+          $drive = Split-Path -Qualifier $env:GITHUB_WORKSPACE
+          $targetDir = "$drive\t"
+          New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+          echo "CARGO_TARGET_DIR=$targetDir" >> $env:GITHUB_ENV
+
+      - name: Configure cmake for ARM64 with clang-cl
+        shell: pwsh
+        run: |
+          echo "CMAKE_GENERATOR=Ninja" >> $env:GITHUB_ENV
+          echo "CMAKE_C_COMPILER=clang-cl" >> $env:GITHUB_ENV
+          echo "CMAKE_CXX_COMPILER=clang-cl" >> $env:GITHUB_ENV
+          echo "CMAKE_C_COMPILER_TARGET=aarch64-pc-windows-msvc" >> $env:GITHUB_ENV
+          echo "CMAKE_CXX_COMPILER_TARGET=aarch64-pc-windows-msvc" >> $env:GITHUB_ENV
+          echo "CL=/EHsc" >> $env:GITHUB_ENV
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-pc-windows-msvc
-
-      - name: Set up environment for Clang
-        shell: pwsh
-        run: |
-          $clangPath = "C:\Program Files\LLVM\bin"
-          Add-Content -Path $env:GITHUB_ENV -Value "CC=clang-cl"
-          Add-Content -Path $env:GITHUB_ENV -Value "CXX=clang++"
-          Add-Content -Path $env:GITHUB_ENV -Value "LIBCLLIB_PATH=$clangPath"
-          $env:PATH = "$clangPath;$env:PATH"
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -213,17 +230,13 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: |
-          $env:CC = "clang-cl"
-          $env:CXX = "clang++"
-          $env:AR = "llvm-lib"
-          cargo build --release --target aarch64-pc-windows-msvc
+        run: cargo build --release --target aarch64-pc-windows-msvc
 
       - name: Package
         shell: pwsh
         run: |
           mkdir -p dist
-          Compress-Archive -Path target/aarch64-pc-windows-msvc/release/handy-cli.exe -DestinationPath dist/handy-cli-aarch64-pc-windows-msvc.zip
+          Compress-Archive -Path t/aarch64-pc-windows-msvc/release/handy-cli.exe -DestinationPath dist/handy-cli-aarch64-pc-windows-msvc.zip
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
