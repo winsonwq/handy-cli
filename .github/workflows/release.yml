@@ -158,13 +158,20 @@ jobs:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Clean previous build artifacts
+        shell: pwsh
+        run: |
+          if (Test-Path "target") {
+            Remove-Item -Recurse -Force "target"
+            Write-Host "Cleaned target directory"
+          }
+
       - name: Build
         env:
-          # Disable Vulkan to avoid compilation issues on Windows
-          WHISPER_CPP_BUILD_VULKAN: "0"
-          GGML_BUILD_VULKAN: "0"
-          GGML_VULKAN: "OFF"
-          CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS: "0"
+          # Disable Vulkan - set VULKAN_SDK to empty to skip Vulkan detection
+          VULKAN_SDK: ""
+          WHISPER_CPP_BUILD_VULKAN: "OFF"
+          BUILD_VULKAN: "OFF"
         run: cargo build --release
 
       - name: Package
