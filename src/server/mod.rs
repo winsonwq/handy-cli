@@ -5,9 +5,12 @@ pub mod handlers;
 use crate::server::handlers::{
     health, list_downloaded_models, list_models, transcribe, transcribe_stream, RouterState,
 };
-use axum::{routing::{get, post}, Router};
-use std::sync::Arc;
 use axum::extract::DefaultBodyLimit;
+use axum::{
+    routing::{get, post},
+    Router,
+};
+use std::sync::Arc;
 
 pub fn create_app(
     engine: &str,
@@ -31,7 +34,13 @@ pub fn create_app(
         .route("/api/models", get(list_models))
         .route("/api/models/downloaded", get(list_downloaded_models))
         // Transcription endpoints with increased body limit
-        .route("/api/transcribe", post(transcribe).layer(body_limit.clone()))
-        .route("/api/transcribe/stream", post(transcribe_stream).layer(body_limit))
+        .route(
+            "/api/transcribe",
+            post(transcribe).layer(body_limit.clone()),
+        )
+        .route(
+            "/api/transcribe/stream",
+            post(transcribe_stream).layer(body_limit),
+        )
         .with_state(state)
 }

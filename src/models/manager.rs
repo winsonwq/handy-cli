@@ -10,6 +10,7 @@
 #![allow(dead_code)] // Some methods reserved for future use
 
 use anyhow::{Context, Result};
+use flate2::read::GzDecoder;
 use futures_util::StreamExt;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -20,11 +21,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tar::Archive;
-use flate2::read::GzDecoder;
 use tokio::sync::mpsc;
 
-pub use crate::models::registry::{DownloadProgress, ModelInfo};
 use crate::models::registry::ModelRegistry;
+pub use crate::models::registry::{DownloadProgress, ModelInfo};
 
 pub type ProgressSender = mpsc::UnboundedSender<DownloadProgress>;
 pub type ProgressReceiver = mpsc::UnboundedReceiver<DownloadProgress>;
@@ -135,7 +135,9 @@ impl ModelManager {
                 let partial_path = self.cache_dir.join(format!("{}.partial", model.filename));
 
                 // Clean up interrupted extractions
-                let extracting_path = self.cache_dir.join(format!("{}.extracting", model.filename));
+                let extracting_path = self
+                    .cache_dir
+                    .join(format!("{}.extracting", model.filename));
                 let is_extracting = {
                     let extracting = self.extracting_models.lock().unwrap();
                     extracting.contains(&model.id)
@@ -222,13 +224,16 @@ impl ModelManager {
                         let mut chars = word.chars();
                         match chars.next() {
                             None => String::new(),
-                            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                            Some(first) => {
+                                first.to_uppercase().collect::<String>() + chars.as_str()
+                            }
                         }
                     })
                     .collect::<Vec<_>>()
                     .join(" ");
 
-                let size_mb = path.metadata()
+                let size_mb = path
+                    .metadata()
                     .map(|m| m.len() / (1024 * 1024))
                     .unwrap_or(0);
 
@@ -277,7 +282,9 @@ impl ModelManager {
             let _ = std::fs::remove_file(path);
             anyhow::bail!(
                 "SHA256 mismatch for model {}: expected {}, got {}",
-                model_id, expected, actual
+                model_id,
+                expected,
+                actual
             );
         }
     }
@@ -310,14 +317,17 @@ impl ModelManager {
             models.get(model_id).cloned()
         };
 
-        let model_info = model_info
-            .ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
+        let model_info =
+            model_info.ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
 
-        let url = model_info.url
+        let url = model_info
+            .url
             .ok_or_else(|| anyhow::anyhow!("No download URL for model: {}", model_id))?;
 
         let model_path = self.cache_dir.join(&model_info.filename);
-        let partial_path = self.cache_dir.join(format!("{}.partial", model_info.filename));
+        let partial_path = self
+            .cache_dir
+            .join(format!("{}.partial", model_info.filename));
 
         // Create cache directory
         std::fs::create_dir_all(&self.cache_dir)?;
@@ -381,8 +391,13 @@ impl ModelManager {
             response = client.get(&url).send().await?;
         }
 
-        if !response.status().is_success() && response.status() != reqwest::StatusCode::PARTIAL_CONTENT {
-            return Err(anyhow::anyhow!("Download failed: HTTP {}", response.status()));
+        if !response.status().is_success()
+            && response.status() != reqwest::StatusCode::PARTIAL_CONTENT
+        {
+            return Err(anyhow::anyhow!(
+                "Download failed: HTTP {}",
+                response.status()
+            ));
         }
 
         let total_size = if resume_from > 0 {
@@ -459,7 +474,8 @@ impl ModelManager {
                 let _ = std::fs::remove_file(&partial_path);
                 anyhow::bail!(
                     "Download incomplete: expected {} bytes, got {}",
-                    total_size, actual_size
+                    total_size,
+                    actual_size
                 );
             }
         }
@@ -473,8 +489,7 @@ impl ModelManager {
         tokio::task::spawn_blocking(move || {
             Self::verify_sha256(&verify_path, verify_expected.as_deref(), &verify_model_id)
         })
-        .await??
-        ;
+        .await??;
 
         // Extract if directory-based model
         if model_info.is_directory {
@@ -484,7 +499,9 @@ impl ModelManager {
                 extracting.push(model_id.to_string());
             }
 
-            let temp_extract_dir = self.cache_dir.join(format!("{}.extracting", model_info.filename));
+            let temp_extract_dir = self
+                .cache_dir
+                .join(format!("{}.extracting", model_info.filename));
             let final_model_dir = self.cache_dir.join(&model_info.filename);
 
             if temp_extract_dir.exists() {
@@ -497,12 +514,11 @@ impl ModelManager {
             let tar = GzDecoder::new(tar_gz);
             let mut archive = Archive::new(tar);
 
-            archive.unpack(&temp_extract_dir)
-                .map_err(|e| {
-                    let _ = std::fs::remove_dir_all(&temp_extract_dir);
-                    let _ = std::fs::remove_file(&partial_path);
-                    e
-                })?;
+            archive.unpack(&temp_extract_dir).map_err(|e| {
+                let _ = std::fs::remove_dir_all(&temp_extract_dir);
+                let _ = std::fs::remove_file(&partial_path);
+                e
+            })?;
 
             // Find extracted directory
             let extracted_dirs: Vec<_> = std::fs::read_dir(&temp_extract_dir)?
@@ -559,7 +575,11 @@ impl ModelManager {
             });
         }
 
-        tracing::info!("Successfully downloaded model {} to {:?}", model_id, model_path);
+        tracing::info!(
+            "Successfully downloaded model {} to {:?}",
+            model_id,
+            model_path
+        );
         Ok(())
     }
 
@@ -586,11 +606,13 @@ impl ModelManager {
             models.get(model_id).cloned()
         };
 
-        let model_info = model_info
-            .ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
+        let model_info =
+            model_info.ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
 
         let model_path = self.cache_dir.join(&model_info.filename);
-        let partial_path = self.cache_dir.join(format!("{}.partial", model_info.filename));
+        let partial_path = self
+            .cache_dir
+            .join(format!("{}.partial", model_info.filename));
 
         let mut deleted = false;
 
@@ -654,7 +676,9 @@ impl ModelManager {
                     crate::models::registry::EngineType::SenseVoice => "sensevoice",
                     crate::models::registry::EngineType::Parakeet => "parakeet",
                     crate::models::registry::EngineType::Moonshine => "moonshine",
-                    crate::models::registry::EngineType::MoonshineStreaming => "moonshine-streaming",
+                    crate::models::registry::EngineType::MoonshineStreaming => {
+                        "moonshine-streaming"
+                    }
                     crate::models::registry::EngineType::GigaAM => "gigaam",
                     crate::models::registry::EngineType::Canary => "canary",
                     crate::models::registry::EngineType::Cohere => "cohere",
@@ -678,7 +702,10 @@ mod tests {
         std::fs::write(&test_file, "hello world").unwrap();
 
         let hash = ModelManager::compute_sha256(&test_file).unwrap();
-        assert_eq!(hash, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
+        assert_eq!(
+            hash,
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        );
 
         std::fs::remove_file(test_file).ok();
     }

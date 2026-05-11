@@ -83,8 +83,7 @@ impl TryFrom<&str> for EngineType {
     type Error = anyhow::Error;
 
     fn try_from(s: &str) -> Result<Self> {
-        EngineType::from_str(s)
-            .ok_or_else(|| anyhow::anyhow!("Unknown engine: {}", s))
+        EngineType::from_str(s).ok_or_else(|| anyhow::anyhow!("Unknown engine: {}", s))
     }
 }
 
@@ -95,7 +94,9 @@ impl From<crate::models::registry::EngineType> for EngineType {
             crate::models::registry::EngineType::SenseVoice => EngineType::SenseVoice,
             crate::models::registry::EngineType::Parakeet => EngineType::Parakeet,
             crate::models::registry::EngineType::Moonshine => EngineType::Moonshine,
-            crate::models::registry::EngineType::MoonshineStreaming => EngineType::MoonshineStreaming,
+            crate::models::registry::EngineType::MoonshineStreaming => {
+                EngineType::MoonshineStreaming
+            }
             crate::models::registry::EngineType::GigaAM => EngineType::GigaAM,
             crate::models::registry::EngineType::Canary => EngineType::Canary,
             crate::models::registry::EngineType::Cohere => EngineType::Cohere,
@@ -111,5 +112,10 @@ pub trait Transcriber {
     /// * `audio` - Audio samples as f32 values
     /// * `language` - Optional language code (e.g., "en", "zh", "ja")
     /// * `translate` - Whether to translate to English (only supported by Whisper, Cohere)
-    fn transcribe(&mut self, audio: &[f32], language: Option<&str>, translate: bool) -> Result<TranscriptionResult>;
+    fn transcribe(
+        &mut self,
+        audio: &[f32],
+        language: Option<&str>,
+        translate: bool,
+    ) -> Result<TranscriptionResult>;
 }

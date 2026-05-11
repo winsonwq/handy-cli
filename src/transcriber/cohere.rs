@@ -1,7 +1,7 @@
 // Cohere transcription engine using transcribe-rs
 // Large multilingual model with high accuracy
 
-use super::{TranscriptionResult, TranscriptionSegment, Transcriber};
+use super::{Transcriber, TranscriptionResult, TranscriptionSegment};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::onnx::cohere::{CohereModel, CohereParams};
@@ -19,7 +19,12 @@ impl CohereTranscriber {
 }
 
 impl Transcriber for CohereTranscriber {
-    fn transcribe(&mut self, audio: &[f32], language: Option<&str>, translate: bool) -> Result<TranscriptionResult> {
+    fn transcribe(
+        &mut self,
+        audio: &[f32],
+        language: Option<&str>,
+        translate: bool,
+    ) -> Result<TranscriptionResult> {
         let lang = language.map(|l| {
             if l == "zh-Hans" || l == "zh-Hant" {
                 "zh".to_string()
@@ -37,8 +42,7 @@ impl Transcriber for CohereTranscriber {
         let result = self.engine.transcribe_with(audio, &params)?;
 
         let segments = result.segments.map(|segs| {
-            segs
-                .into_iter()
+            segs.into_iter()
                 .map(|s| TranscriptionSegment {
                     text: s.text,
                     start: s.start,
@@ -55,5 +59,4 @@ impl Transcriber for CohereTranscriber {
             language_probability: None,
         })
     }
-
 }

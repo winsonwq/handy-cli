@@ -22,13 +22,12 @@ pub async fn run(
     info!("Server listening on {}", addr);
 
     // Build router with CORS (body limit is set in create_app)
-    let app = server::create_app(engine, model, vad_threshold, language)
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any),
-        );
+    let app = server::create_app(engine, model, vad_threshold, language).layer(
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any),
+    );
 
     info!("Starting HTTP server");
     info!("  Engine: {}", engine);

@@ -6,26 +6,26 @@
 use crate::models::registry::ModelRegistry;
 use crate::transcriber::{
     CanaryTranscriber, CohereTranscriber, GigaAMTranscriber, MoonshineTranscriber,
-    ParakeetTranscriber, SenseVoiceTranscriber, TranscriptionResult, Transcriber,
+    ParakeetTranscriber, SenseVoiceTranscriber, Transcriber, TranscriptionResult,
     WhisperTranscriber,
 };
 use axum::response::sse::{Event as SseEvent, Sse};
+use axum::response::Response;
 use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     Json,
 };
-use axum::response::Response;
-use tokio::sync::broadcast;
-use futures_util::{Stream, StreamExt, TryStreamExt};
-use tokio_stream::wrappers::BroadcastStream;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use futures_util::{Stream, StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tokio::sync::broadcast;
+use tokio_stream::wrappers::BroadcastStream;
 
 // Number of samples to accumulate before triggering transcription (1 second at 16kHz)
 #[allow(dead_code)] // Reserved for future use
@@ -45,15 +45,24 @@ enum TranscriberWrapper {
 }
 
 #[allow(dead_code)] // Some variants reserved for future VAD integration
-
 #[derive(Debug, Clone, Serialize)]
 pub enum SseEventData {
     #[allow(dead_code)] // Reserved for VAD integration
-    SpeechStart { timestamp: i64 },
+    SpeechStart {
+        timestamp: i64,
+    },
     #[allow(dead_code)] // Reserved for VAD integration
-    SpeechEnd { timestamp: i64, duration: f32 },
-    Transcript { text: String, partial: bool },
-    Error { message: String },
+    SpeechEnd {
+        timestamp: i64,
+        duration: f32,
+    },
+    Transcript {
+        text: String,
+        partial: bool,
+    },
+    Error {
+        message: String,
+    },
 }
 
 impl SseEventData {
@@ -62,15 +71,14 @@ impl SseEventData {
             SseEventData::SpeechStart { timestamp } => {
                 serde_json::json!({"timestamp": timestamp}).to_string()
             }
-            SseEventData::SpeechEnd { timestamp, duration } => {
-                serde_json::json!({"timestamp": timestamp, "duration": duration}).to_string()
-            }
+            SseEventData::SpeechEnd {
+                timestamp,
+                duration,
+            } => serde_json::json!({"timestamp": timestamp, "duration": duration}).to_string(),
             SseEventData::Transcript { text, partial } => {
                 serde_json::json!({"text": text, "partial": partial}).to_string()
             }
-            SseEventData::Error { message } => {
-                serde_json::json!({"message": message}).to_string()
-            }
+            SseEventData::Error { message } => serde_json::json!({"message": message}).to_string(),
         };
         SseEvent::default().event(event_type).data(data)
     }
@@ -134,22 +142,25 @@ impl RouterState {
             }
         }
 
-        let model_id = self.model.clone().unwrap_or_else(|| match self.engine.as_str() {
-            "sensevoice" => "sense-voice-int8".to_string(),
-            "whisper" => "small".to_string(),
-            "parakeet" => "parakeet-tdt-0.6b-v2".to_string(),
-            "moonshine" | "moonshine-base" => "moonshine-base".to_string(),
-            "moonshine-streaming" | "moonshinestreaming" | "moonshine-tiny-streaming-en" => {
-                "moonshine-tiny-streaming-en".to_string()
-            }
-            "moonshine-small-streaming-en" => "moonshine-small-streaming-en".to_string(),
-            "moonshine-medium-streaming-en" => "moonshine-medium-streaming-en".to_string(),
-            "gigaam" | "gigaam-v3" => "gigaam-v3-e2e-ctc".to_string(),
-            "canary" | "canary-180m" => "canary-180m-flash".to_string(),
-            "canary-1b" => "canary-1b-v2".to_string(),
-            "cohere" => "cohere-int8".to_string(),
-            _ => "small".to_string(),
-        });
+        let model_id = self
+            .model
+            .clone()
+            .unwrap_or_else(|| match self.engine.as_str() {
+                "sensevoice" => "sense-voice-int8".to_string(),
+                "whisper" => "small".to_string(),
+                "parakeet" => "parakeet-tdt-0.6b-v2".to_string(),
+                "moonshine" | "moonshine-base" => "moonshine-base".to_string(),
+                "moonshine-streaming" | "moonshinestreaming" | "moonshine-tiny-streaming-en" => {
+                    "moonshine-tiny-streaming-en".to_string()
+                }
+                "moonshine-small-streaming-en" => "moonshine-small-streaming-en".to_string(),
+                "moonshine-medium-streaming-en" => "moonshine-medium-streaming-en".to_string(),
+                "gigaam" | "gigaam-v3" => "gigaam-v3-e2e-ctc".to_string(),
+                "canary" | "canary-180m" => "canary-180m-flash".to_string(),
+                "canary-1b" => "canary-1b-v2".to_string(),
+                "cohere" => "cohere-int8".to_string(),
+                _ => "small".to_string(),
+            });
 
         // For whisper, model_id refers to the model name (small, base, etc.)
         // The actual file is ggml-{model_id}.bin
@@ -228,27 +239,27 @@ impl RouterState {
         });
 
         match guard.as_mut() {
-            Some(TranscriberWrapper::Whisper(t)) => {
-                t.transcribe(audio, lang, translate).map_err(|e| e.to_string())
-            }
-            Some(TranscriberWrapper::SenseVoice(t)) => {
-                t.transcribe(audio, lang, translate).map_err(|e| e.to_string())
-            }
-            Some(TranscriberWrapper::Parakeet(t)) => {
-                t.transcribe(audio, lang, translate).map_err(|e| e.to_string())
-            }
-            Some(TranscriberWrapper::Moonshine(t)) => {
-                t.transcribe(audio, lang, translate).map_err(|e| e.to_string())
-            }
-            Some(TranscriberWrapper::GigaAM(t)) => {
-                t.transcribe(audio, lang, translate).map_err(|e| e.to_string())
-            }
-            Some(TranscriberWrapper::Canary(t)) => {
-                t.transcribe(audio, lang, translate).map_err(|e| e.to_string())
-            }
-            Some(TranscriberWrapper::Cohere(t)) => {
-                t.transcribe(audio, lang, translate).map_err(|e| e.to_string())
-            }
+            Some(TranscriberWrapper::Whisper(t)) => t
+                .transcribe(audio, lang, translate)
+                .map_err(|e| e.to_string()),
+            Some(TranscriberWrapper::SenseVoice(t)) => t
+                .transcribe(audio, lang, translate)
+                .map_err(|e| e.to_string()),
+            Some(TranscriberWrapper::Parakeet(t)) => t
+                .transcribe(audio, lang, translate)
+                .map_err(|e| e.to_string()),
+            Some(TranscriberWrapper::Moonshine(t)) => t
+                .transcribe(audio, lang, translate)
+                .map_err(|e| e.to_string()),
+            Some(TranscriberWrapper::GigaAM(t)) => t
+                .transcribe(audio, lang, translate)
+                .map_err(|e| e.to_string()),
+            Some(TranscriberWrapper::Canary(t)) => t
+                .transcribe(audio, lang, translate)
+                .map_err(|e| e.to_string()),
+            Some(TranscriberWrapper::Cohere(t)) => t
+                .transcribe(audio, lang, translate)
+                .map_err(|e| e.to_string()),
             None => Err("Transcriber not loaded. Call /api/health first".to_string()),
         }
     }
@@ -263,7 +274,9 @@ pub struct HealthResponse {
     pub loaded: bool,
 }
 
-pub async fn health(State(state): State<Arc<RouterState>>) -> Result<Json<HealthResponse>, AppError> {
+pub async fn health(
+    State(state): State<Arc<RouterState>>,
+) -> Result<Json<HealthResponse>, AppError> {
     let loaded = state.load_transcriber().is_ok();
 
     Ok(Json(HealthResponse {
@@ -350,9 +363,7 @@ pub async fn transcribe(
         .collect();
 
     if samples.is_empty() {
-        return Err(AppError::bad_request(
-            "No audio samples found".to_string(),
-        ));
+        return Err(AppError::bad_request("No audio samples found".to_string()));
     }
 
     let sample_rate = req.sample_rate.unwrap_or(16000);
@@ -367,7 +378,11 @@ pub async fn transcribe(
         .map_err(|e| AppError::internal(format!("Failed to load transcriber: {}", e)))?;
 
     let result = state
-        .transcribe(&final_samples, req.language.as_deref(), req.translate.unwrap_or(false))
+        .transcribe(
+            &final_samples,
+            req.language.as_deref(),
+            req.translate.unwrap_or(false),
+        )
         .map_err(|e| AppError::internal(format!("Transcription failed: {}", e)))?;
 
     let segments = result.segments.map(|segs| {
@@ -424,15 +439,8 @@ pub async fn transcribe_stream(
 
     // Spawn async task to process streaming audio
     tokio::spawn(async move {
-        if let Err(e) = process_streaming_audio(
-            tx,
-            body,
-            sample_rate,
-            language,
-            translate,
-            state,
-        )
-        .await
+        if let Err(e) =
+            process_streaming_audio(tx, body, sample_rate, language, translate, state).await
         {
             tracing::error!("Streaming transcription error: {}", e);
         }
@@ -625,11 +633,7 @@ async fn process_streaming_audio(
 }
 
 // Helper function to resample audio
-fn resample_audio(
-    samples: &[f32],
-    from_rate: u32,
-    to_rate: u32,
-) -> Result<Vec<f32>, AppError> {
+fn resample_audio(samples: &[f32], from_rate: u32, to_rate: u32) -> Result<Vec<f32>, AppError> {
     if from_rate == to_rate {
         return Ok(samples.to_vec());
     }

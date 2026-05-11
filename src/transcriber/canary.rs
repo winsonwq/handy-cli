@@ -1,7 +1,7 @@
 // Canary transcription engine using transcribe-rs
 // Supports translation mode for English, German, Spanish, French
 
-use super::{TranscriptionResult, TranscriptionSegment, Transcriber};
+use super::{Transcriber, TranscriptionResult, TranscriptionSegment};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::onnx::canary::{CanaryModel, CanaryParams};
@@ -19,7 +19,12 @@ impl CanaryTranscriber {
 }
 
 impl Transcriber for CanaryTranscriber {
-    fn transcribe(&mut self, audio: &[f32], language: Option<&str>, translate: bool) -> Result<TranscriptionResult> {
+    fn transcribe(
+        &mut self,
+        audio: &[f32],
+        language: Option<&str>,
+        translate: bool,
+    ) -> Result<TranscriptionResult> {
         let lang = language.map(|l| {
             if l == "zh-Hans" || l == "zh-Hant" {
                 "zh".to_string()
@@ -46,8 +51,7 @@ impl Transcriber for CanaryTranscriber {
         let result = self.engine.transcribe_with(audio, &params)?;
 
         let segments = result.segments.map(|segs| {
-            segs
-                .into_iter()
+            segs.into_iter()
                 .map(|s| TranscriptionSegment {
                     text: s.text,
                     start: s.start,
@@ -64,5 +68,4 @@ impl Transcriber for CanaryTranscriber {
             language_probability: None,
         })
     }
-
 }

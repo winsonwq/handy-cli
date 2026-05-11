@@ -1,6 +1,6 @@
 // Whisper transcription engine using transcribe-rs
 
-use super::{TranscriptionResult, Transcriber};
+use super::{Transcriber, TranscriptionResult};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::whisper_cpp::{WhisperEngine, WhisperInferenceParams};
@@ -17,7 +17,12 @@ impl WhisperTranscriber {
 }
 
 impl Transcriber for WhisperTranscriber {
-    fn transcribe(&mut self, audio: &[f32], language: Option<&str>, translate: bool) -> Result<TranscriptionResult> {
+    fn transcribe(
+        &mut self,
+        audio: &[f32],
+        language: Option<&str>,
+        translate: bool,
+    ) -> Result<TranscriptionResult> {
         let lang = language.map(|l| {
             if l == "zh-Hans" || l == "zh-Hant" {
                 "zh".to_string()
@@ -42,5 +47,4 @@ impl Transcriber for WhisperTranscriber {
             language_probability: None,
         })
     }
-
 }

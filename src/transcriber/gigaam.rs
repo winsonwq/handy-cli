@@ -1,7 +1,7 @@
 // GigaAM transcription engine using transcribe-rs
 // Supports GigaAM v3 for Russian speech recognition
 
-use super::{TranscriptionResult, TranscriptionSegment, Transcriber};
+use super::{Transcriber, TranscriptionResult, TranscriptionSegment};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::onnx::gigaam::{GigaAMModel, GigaAMParams};
@@ -19,14 +19,18 @@ impl GigaAMTranscriber {
 }
 
 impl Transcriber for GigaAMTranscriber {
-    fn transcribe(&mut self, audio: &[f32], _language: Option<&str>, _translate: bool) -> Result<TranscriptionResult> {
+    fn transcribe(
+        &mut self,
+        audio: &[f32],
+        _language: Option<&str>,
+        _translate: bool,
+    ) -> Result<TranscriptionResult> {
         // GigaAM is Russian-only
         let params = GigaAMParams::default();
         let result = self.engine.transcribe_with(audio, &params)?;
 
         let segments = result.segments.map(|segs| {
-            segs
-                .into_iter()
+            segs.into_iter()
                 .map(|s| TranscriptionSegment {
                     text: s.text,
                     start: s.start,
@@ -43,5 +47,4 @@ impl Transcriber for GigaAMTranscriber {
             language_probability: None,
         })
     }
-
 }

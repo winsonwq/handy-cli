@@ -20,7 +20,10 @@ pub async fn run(model_id: &str) -> Result<()> {
     let model = match model_info {
         Some(m) => m,
         None => {
-            anyhow::bail!("Model '{}' not found. Run `handy-cli list-models` to see available models.", model_id);
+            anyhow::bail!(
+                "Model '{}' not found. Run `handy-cli list-models` to see available models.",
+                model_id
+            );
         }
     };
 
@@ -46,7 +49,10 @@ pub async fn run(model_id: &str) -> Result<()> {
                     progress.total as f64 / 1_000_000.0,
                 );
             } else {
-                println!("\rDownloaded: {:.1} MB", progress.downloaded as f64 / 1_000_000.0);
+                println!(
+                    "\rDownloaded: {:.1} MB",
+                    progress.downloaded as f64 / 1_000_000.0
+                );
             }
         }
     });

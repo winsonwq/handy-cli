@@ -1,6 +1,6 @@
 // SenseVoice transcription engine using transcribe-rs
 
-use super::{TranscriptionResult, TranscriptionSegment, Transcriber};
+use super::{Transcriber, TranscriptionResult, TranscriptionSegment};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::onnx::sense_voice::SenseVoiceModel;
@@ -19,14 +19,17 @@ impl SenseVoiceTranscriber {
 }
 
 impl Transcriber for SenseVoiceTranscriber {
-    fn transcribe(&mut self, audio: &[f32], language: Option<&str>, _translate: bool) -> Result<TranscriptionResult> {
+    fn transcribe(
+        &mut self,
+        audio: &[f32],
+        language: Option<&str>,
+        _translate: bool,
+    ) -> Result<TranscriptionResult> {
         // Note: SenseVoice doesn't support translation, so we ignore the translate parameter
         let options = TranscribeOptions {
-            language: language.map(|l| {
-                match l {
-                    "zh-Hans" | "zh-Hant" => "zh".to_string(),
-                    s => s.to_string(),
-                }
+            language: language.map(|l| match l {
+                "zh-Hans" | "zh-Hant" => "zh".to_string(),
+                s => s.to_string(),
             }),
             translate: false,
             leading_silence_ms: None,
@@ -36,8 +39,7 @@ impl Transcriber for SenseVoiceTranscriber {
         let result = self.engine.transcribe(audio, &options)?;
 
         let segments = result.segments.map(|segs| {
-            segs
-                .into_iter()
+            segs.into_iter()
                 .map(|s| TranscriptionSegment {
                     text: s.text,
                     start: s.start,
@@ -54,5 +56,4 @@ impl Transcriber for SenseVoiceTranscriber {
             language_probability: None,
         })
     }
-
 }

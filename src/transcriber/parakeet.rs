@@ -1,7 +1,7 @@
 // Parakeet transcription engine using transcribe-rs
 // Supports Parakeet V2 and V3 models for fast English/European language transcription
 
-use super::{TranscriptionResult, TranscriptionSegment, Transcriber};
+use super::{Transcriber, TranscriptionResult, TranscriptionSegment};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::onnx::parakeet::{ParakeetModel, ParakeetParams};
@@ -19,14 +19,18 @@ impl ParakeetTranscriber {
 }
 
 impl Transcriber for ParakeetTranscriber {
-    fn transcribe(&mut self, audio: &[f32], _language: Option<&str>, _translate: bool) -> Result<TranscriptionResult> {
+    fn transcribe(
+        &mut self,
+        audio: &[f32],
+        _language: Option<&str>,
+        _translate: bool,
+    ) -> Result<TranscriptionResult> {
         // Parakeet doesn't support language selection - it auto-detects
         let params = ParakeetParams::default();
         let result = self.engine.transcribe_with(audio, &params)?;
 
         let segments = result.segments.map(|segs| {
-            segs
-                .into_iter()
+            segs.into_iter()
                 .map(|s| TranscriptionSegment {
                     text: s.text,
                     start: s.start,
@@ -43,5 +47,4 @@ impl Transcriber for ParakeetTranscriber {
             language_probability: None,
         })
     }
-
 }

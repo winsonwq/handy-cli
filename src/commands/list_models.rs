@@ -53,12 +53,7 @@ pub async fn run(engine_filter: Option<&str>) -> Result<()> {
 
         let recommended = if model.is_recommended { " ★" } else { "" };
 
-        println!(
-            "  {}{}{}",
-            model.name,
-            recommended,
-            status
-        );
+        println!("  {}{}{}", model.name, recommended, status);
         println!("    ID: {}", model.id);
         println!("    Size: {} MB", model.size_mb);
         println!("    Accuracy: {:.0}%", model.accuracy_score * 100.0);
@@ -85,7 +80,10 @@ pub async fn run(engine_filter: Option<&str>) -> Result<()> {
     // Print download status summary
     let downloaded_count = models.iter().filter(|m| m.is_downloaded).count();
     let total_count = models.len();
-    println!("({} of {} models downloaded)", downloaded_count, total_count);
+    println!(
+        "({} of {} models downloaded)",
+        downloaded_count, total_count
+    );
 
     Ok(())
 }
