@@ -51,14 +51,10 @@ jobs:
       - name: Package
         run: |
           mkdir -p dist
-          # Package x86_64
-          mkdir -p "handy-cli-x86_64-apple-darwin"
-          cp target/release/handy-cli "handy-cli-x86_64-apple-darwin/"
-          tar -czvf dist/handy-cli-x86_64-apple-darwin.tar.gz handy-cli-x86_64-apple-darwin
-          # Package aarch64
-          mkdir -p "handy-cli-aarch64-apple-darwin"
-          cp target/aarch64-apple-darwin/release/handy-cli "handy-cli-aarch64-apple-darwin/"
-          tar -czvf dist/handy-cli-aarch64-apple-darwin.tar.gz handy-cli-aarch64-apple-darwin
+          # Package x86_64 directly (no extra folder)
+          tar -czvf dist/handy-cli-x86_64-apple-darwin.tar.gz -C target/release handy-cli
+          # Package aarch64 directly (no extra folder)
+          tar -czvf dist/handy-cli-aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin/release handy-cli
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -68,7 +64,7 @@ jobs:
 
   # Build for Linux
   build-linux:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,7 +72,10 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-gnu
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Add Windows target for cross-compile
+        run: rustup target add x86_64-pc-windows-gnu
 
       - name: Install system dependencies
         run: |
@@ -106,14 +105,10 @@ jobs:
       - name: Package
         run: |
           mkdir -p dist
-          # Package Linux
-          mkdir -p "handy-cli-x86_64-unknown-linux-gnu"
-          cp target/release/handy-cli "handy-cli-x86_64-unknown-linux-gnu/"
-          tar -czvf dist/handy-cli-x86_64-unknown-linux-gnu.tar.gz handy-cli-x86_64-unknown-linux-gnu
-          # Package Windows
-          mkdir -p "handy-cli-x86_64-pc-windows-gnu"
-          cp target/x86_64-pc-windows-gnu/release/handy-cli.exe "handy-cli-x86_64-pc-windows-gnu/"
-          tar -czvf dist/handy-cli-x86_64-pc-windows-gnu.tar.gz handy-cli-x86_64-pc-windows-gnu
+          # Package Linux directly (no extra folder)
+          tar -czvf dist/handy-cli-x86_64-unknown-linux-gnu.tar.gz -C target/release handy-cli
+          # Package Windows directly (no extra folder)
+          tar -czvf dist/handy-cli-x86_64-pc-windows-gnu.tar.gz -C target/x86_64-pc-windows-gnu/release handy-cli.exe
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
