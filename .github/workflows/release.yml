@@ -191,24 +191,49 @@ jobs:
 
       - name: Install Vulkan SDK
         run: |
-          choco install vulkan-sdk -y
+          choco install vulkan-sdk -y --force
+
+      - name: Verify Vulkan SDK installation
+        shell: bash
+        run: |
+          # Check common installation paths
+          echo "=== Checking Vulkan SDK installation ==="
+          for path in "/c/Program Files (x86)/VulkanSDK" "$PROGRAMFILES/VulkanSDK" "C:/VulkanSDK"; do
+            if [ -d "$path" ]; then
+              echo "Found: $path"
+              ls -la "$path"
+            fi
+          done
 
       - name: Set Vulkan SDK path
         shell: bash
         run: |
           # Find Vulkan SDK installed by choco
           VULKAN_PATH=""
-          if [ -d "/c/Program Files (x86)/VulkanSDK" ]; then
-            VULKAN_PATH=$(ls -d "/c/Program Files (x86)/VulkanSDK/"*/ 2>/dev/null | head -1 | sed 's/\/$//')
-          elif [ -d "$PROGRAMFILES/VulkanSDK" ]; then
-            VULKAN_PATH=$(ls -d "$PROGRAMFILES/VulkanSDK/"*/ 2>/dev/null | head -1 | sed 's/\/$//')
-          fi
+          # Check multiple possible locations
+          for dir in "/c/Program Files (x86)/VulkanSDK" \
+                     "/c/Program Files/VulkanSDK" \
+                     "$PROGRAMFILES/VulkanSDK" \
+                     "$PROGRAMFILES(x86)/VulkanSDK" \
+                     "C:/VulkanSDK"; do
+            if [ -d "$dir" ]; then
+              echo "Checking: $dir"
+              # Get the latest version directory
+              latest=$(ls -td "$dir"/*/ 2>/dev/null | head -1)
+              if [ -n "$latest" ]; then
+                VULKAN_PATH="$latest"
+                break
+              fi
+            fi
+          done
 
           if [ -n "$VULKAN_PATH" ]; then
-            echo "VULKAN_SDK=$VULKAN_PATH" >> $GITHUB_ENV
-            echo "Found Vulkan SDK at: $VULKAN_PATH"
+            echo "VULKAN_SDK=${VULKAN_PATH%/}" >> $GITHUB_ENV
+            echo "Found Vulkan SDK at: ${VULKAN_PATH%/}"
+            echo "Contents:"
+            ls -la "${VULKAN_PATH%/}"
           else
-            echo "Vulkan SDK not found"
+            echo "ERROR: Vulkan SDK not found"
             exit 1
           fi
 
