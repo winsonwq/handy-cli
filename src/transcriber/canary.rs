@@ -1,7 +1,7 @@
 // Canary transcription engine using transcribe-rs
 // Supports translation mode for English, German, Spanish, French
 
-use super::{EngineType, TranscriptionResult, TranscriptionSegment, Transcriber};
+use super::{TranscriptionResult, TranscriptionSegment, Transcriber};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::onnx::canary::{CanaryModel, CanaryParams};
@@ -65,7 +65,4 @@ impl Transcriber for CanaryTranscriber {
         })
     }
 
-    fn engine_type(&self) -> EngineType {
-        EngineType::Canary
-    }
 }

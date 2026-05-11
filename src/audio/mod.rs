@@ -1,7 +1,9 @@
 // Audio capture module
+// Note: Audio capture is currently handled via the HTTP API streaming endpoint
+// This module is reserved for future direct audio device capture support
 
-pub mod capture;
+#![allow(dead_code)] // TODO: Remove when implementing audio device capture
+
 pub mod device;
 
-pub use capture::AudioCapture;
 pub use device::AudioDevice;

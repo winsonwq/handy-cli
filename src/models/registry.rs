@@ -1,5 +1,7 @@
 // Model registry - defines all available models
 
+#![allow(dead_code)] // Some methods reserved for future use
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

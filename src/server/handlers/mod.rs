@@ -21,16 +21,15 @@ use tokio::sync::broadcast;
 use futures_util::{Stream, StreamExt, TryStreamExt};
 use tokio_stream::wrappers::BroadcastStream;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine as _;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-// Number of samples to accumulate before triggering transcription (5 seconds at 16kHz)
-const STREAM_CHUNK_SAMPLES: usize = 16_000 * 5;
+// Number of samples to accumulate before triggering transcription (1 second at 16kHz)
+#[allow(dead_code)] // Reserved for future use
+const STREAM_CHUNK_SAMPLES: usize = 16_000;
 
 // Global transcriber instance (lazy loaded)
 static TRANSCRIBER: Lazy<Mutex<Option<TranscriberWrapper>>> = Lazy::new(|| Mutex::new(None));
@@ -45,9 +44,13 @@ enum TranscriberWrapper {
     Cohere(CohereTranscriber),
 }
 
+#[allow(dead_code)] // Some variants reserved for future VAD integration
+
 #[derive(Debug, Clone, Serialize)]
 pub enum SseEventData {
+    #[allow(dead_code)] // Reserved for VAD integration
     SpeechStart { timestamp: i64 },
+    #[allow(dead_code)] // Reserved for VAD integration
     SpeechEnd { timestamp: i64, duration: f32 },
     Transcript { text: String, partial: bool },
     Error { message: String },
@@ -76,6 +79,7 @@ impl SseEventData {
 pub struct RouterState {
     pub engine: String,
     pub model: Option<String>,
+    #[allow(dead_code)] // Reserved for VAD integration
     pub vad_threshold: f32,
     pub language: String,
     pub model_dir: PathBuf,

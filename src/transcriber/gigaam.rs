@@ -1,7 +1,7 @@
 // GigaAM transcription engine using transcribe-rs
 // Supports GigaAM v3 for Russian speech recognition
 
-use super::{EngineType, TranscriptionResult, TranscriptionSegment, Transcriber};
+use super::{TranscriptionResult, TranscriptionSegment, Transcriber};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::onnx::gigaam::{GigaAMModel, GigaAMParams};
@@ -44,7 +44,4 @@ impl Transcriber for GigaAMTranscriber {
         })
     }
 
-    fn engine_type(&self) -> EngineType {
-        EngineType::GigaAM
-    }
 }

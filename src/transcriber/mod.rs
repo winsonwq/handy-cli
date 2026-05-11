@@ -1,7 +1,6 @@
 // Transcription module - handles ASR engines
 //
 // Uses transcribe-rs for actual transcription.
-
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
@@ -37,6 +36,7 @@ pub struct TranscriptionSegment {
     pub end: f32,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EngineType {
     Whisper,
@@ -64,6 +64,7 @@ impl EngineType {
         }
     }
 
+    #[allow(dead_code)] // Reserved for future use
     pub fn as_str(&self) -> &'static str {
         match self {
             EngineType::Whisper => "whisper",
@@ -111,5 +112,4 @@ pub trait Transcriber {
     /// * `language` - Optional language code (e.g., "en", "zh", "ja")
     /// * `translate` - Whether to translate to English (only supported by Whisper, Cohere)
     fn transcribe(&mut self, audio: &[f32], language: Option<&str>, translate: bool) -> Result<TranscriptionResult>;
-    fn engine_type(&self) -> EngineType;
 }

@@ -1,7 +1,7 @@
 // Cohere transcription engine using transcribe-rs
 // Large multilingual model with high accuracy
 
-use super::{EngineType, TranscriptionResult, TranscriptionSegment, Transcriber};
+use super::{TranscriptionResult, TranscriptionSegment, Transcriber};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::onnx::cohere::{CohereModel, CohereParams};
@@ -56,7 +56,4 @@ impl Transcriber for CohereTranscriber {
         })
     }
 
-    fn engine_type(&self) -> EngineType {
-        EngineType::Cohere
-    }
 }

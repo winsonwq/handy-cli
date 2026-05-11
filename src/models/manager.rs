@@ -7,6 +7,8 @@
 // - Custom model auto-discovery
 // - Model deletion
 
+#![allow(dead_code)] // Some methods reserved for future use
+
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use sha2::{Digest, Sha256};

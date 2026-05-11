@@ -1,6 +1,6 @@
 // Whisper transcription engine using transcribe-rs
 
-use super::{EngineType, TranscriptionResult, Transcriber};
+use super::{TranscriptionResult, Transcriber};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::whisper_cpp::{WhisperEngine, WhisperInferenceParams};
@@ -43,7 +43,4 @@ impl Transcriber for WhisperTranscriber {
         })
     }
 
-    fn engine_type(&self) -> EngineType {
-        EngineType::Whisper
-    }
 }

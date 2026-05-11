@@ -1,6 +1,6 @@
 // SenseVoice transcription engine using transcribe-rs
 
-use super::{EngineType, TranscriptionResult, TranscriptionSegment, Transcriber};
+use super::{TranscriptionResult, TranscriptionSegment, Transcriber};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::onnx::sense_voice::SenseVoiceModel;
@@ -55,7 +55,4 @@ impl Transcriber for SenseVoiceTranscriber {
         })
     }
 
-    fn engine_type(&self) -> EngineType {
-        EngineType::SenseVoice
-    }
 }

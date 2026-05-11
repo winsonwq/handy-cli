@@ -1,4 +1,7 @@
 // Configuration for handy-cli
+// Note: Currently using command-line arguments. Config module reserved for future use.
+
+#![allow(dead_code)]
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

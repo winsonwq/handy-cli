@@ -1,4 +1,7 @@
 // Error types for handy-cli
+// Note: Currently using Result<String, String> in handlers. AppError reserved for future use.
+
+#![allow(dead_code)]
 
 use axum::{
     http::StatusCode,

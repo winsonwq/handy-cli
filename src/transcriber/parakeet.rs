@@ -1,7 +1,7 @@
 // Parakeet transcription engine using transcribe-rs
 // Supports Parakeet V2 and V3 models for fast English/European language transcription
 
-use super::{EngineType, TranscriptionResult, TranscriptionSegment, Transcriber};
+use super::{TranscriptionResult, TranscriptionSegment, Transcriber};
 use anyhow::Result;
 use std::path::Path;
 use transcribe_rs::onnx::parakeet::{ParakeetModel, ParakeetParams};
@@ -44,7 +44,4 @@ impl Transcriber for ParakeetTranscriber {
         })
     }
 
-    fn engine_type(&self) -> EngineType {
-        EngineType::Parakeet
-    }
 }
