@@ -461,87 +461,28 @@ async fn process_streaming_audio(
     state: Arc<RouterState>,
 ) -> Result<(), String> {
     // Buffer for accumulating base64 data
-    let mut base64_buffer = String::new();
+    let mut base64_buffer = Vec::new();
     // Buffer for decoded audio samples
     let mut audio_buffer: Vec<f32> = Vec::new();
-    // To handle partial base64 chunks, we need to track incomplete data
-    let mut pending_base64_chars: Vec<u8> = Vec::new();
 
-    // Get data stream from body (takes ownership)
-    let mut data_stream = body.into_data_stream();
+    // Convert body to data stream
+    let mut body_stream = body.into_data_stream();
 
-    // Read body in chunks and accumulate audio
-    while let Some(chunk_result) = data_stream.next().await {
+    while let Some(chunk_result) = body_stream.next().await {
         let chunk = chunk_result.map_err(|e| format!("Body read error: {}", e))?;
-
-        // Add chunk to base64 buffer
-        base64_buffer.push_str(&String::from_utf8_lossy(&chunk));
-
-        // Try to decode complete base64 chunks (base64 outputs 3 bytes per 4 input chars)
-        let mut working_buffer = pending_base64_chars.clone();
-        working_buffer.extend_from_slice(base64_buffer.as_bytes());
-
-        // Calculate how many complete 4-character groups we have
-        let base64_len = working_buffer.len();
-        let complete_groups = base64_len / 4;
-        let remainder = base64_len % 4;
-        let complete_bytes = complete_groups * 4;
-
-        if complete_bytes > 0 {
-            let complete_base64 = &working_buffer[..complete_bytes];
-            let partial = &working_buffer[complete_bytes..];
-
-            // Decode complete groups
-            let mut decode_buffer = vec![0u8; complete_bytes / 4 * 3 + remainder];
-            let decoded_len = STANDARD
-                .decode_slice_unchecked(complete_base64, &mut decode_buffer)
-                .map_err(|e| format!("Base64 decode error: {}", e))?;
-
-            // Save remainder for next iteration
-            pending_base64_chars = partial.to_vec();
-            base64_buffer.clear();
-
-            // Convert bytes to f32 samples and accumulate
-            for chunk in decode_buffer[..decoded_len].chunks(2) {
-                if chunk.len() == 2 {
-                    let s = i16::from_le_bytes([chunk[0], chunk[1]]);
-                    audio_buffer.push(s as f32 / i16::MAX as f32);
-                }
-            }
-
-            // Send progress update
-            let duration_sec = audio_buffer.len() as f32 / 16000.0;
-            let _ = tx.send(SseEventData::Transcript {
-                text: format!("Received {:.1}s of audio...", duration_sec),
-                partial: true,
-            });
-        }
+        base64_buffer.extend_from_slice(&chunk);
     }
 
-    // Process any remaining data
-    if !pending_base64_chars.is_empty() || !base64_buffer.is_empty() {
-        let mut all_data: Vec<u8> = pending_base64_chars;
-        if !base64_buffer.is_empty() {
-            all_data.extend_from_slice(base64_buffer.as_bytes());
-        }
+    // Now decode all at once
+    let audio_bytes = BASE64
+        .decode(&base64_buffer)
+        .map_err(|e| format!("Base64 decode error: {}", e))?;
 
-        // Pad to complete groups if needed
-        while all_data.len() % 4 != 0 {
-            all_data.push(b'=');
-        }
-
-        if !all_data.is_empty() {
-            let mut decode_buffer = vec![0u8; all_data.len() / 4 * 3];
-            if let Ok(decoded_len) =
-                STANDARD.decode_slice_unchecked(&all_data, &mut decode_buffer)
-            {
-                for chunk in decode_buffer[..decoded_len].chunks(2) {
-                    if chunk.len() == 2 {
-                        let s = i16::from_le_bytes([chunk[0], chunk[1]]);
-                        audio_buffer.push(s as f32 / i16::MAX as f32);
-                    }
-                }
-            }
+    // Convert to f32 samples
+    for chunk in audio_bytes.chunks(2) {
+        if chunk.len() == 2 {
+            let s = i16::from_le_bytes([chunk[0], chunk[1]]);
+            audio_buffer.push(s as f32 / i16::MAX as f32);
         }
     }
 
@@ -579,17 +520,10 @@ async fn process_streaming_audio(
             audio_buffer
         };
 
-        let sample_count = samples.len();
-        let first_sample = samples.first().copied().unwrap_or(0.0);
-        let last_sample = samples.last().copied().unwrap_or(0.0);
-        tracing::info!("Calling transcribe with {} samples, range: [{}, {}]", sample_count, first_sample, last_sample);
-
         let result = state.transcribe(&samples, language.as_deref(), translate);
-        tracing::info!("Transcribe call completed, result: {:?}", result);
 
         match result {
             Ok(result) => {
-                tracing::info!("Transcription success: {} chars", result.text.len());
                 let event = SseEventData::Transcript {
                     text: result.text.clone(),
                     partial: false,
