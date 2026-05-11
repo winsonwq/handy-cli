@@ -8,6 +8,17 @@ This project was inspired by [Handy](https://github.com/cjpais/Handy), which imp
 
 ---
 
+## Features
+
+- **Multi-Engine Support**: 7 ASR engines (SenseVoice, Whisper, Parakeet, Moonshine, GigaAM, Canary, Cohere) with 16+ models
+- **High Performance**: Rust-based with GPU acceleration support (CUDA, DirectML, Vulkan, Metal)
+- **Cross-Platform**: macOS (Intel + Apple Silicon), Linux (x86_64 + ARM64), Windows (x86_64 + ARM64)
+- **Streaming Ready**: Real-time streaming transcription via SSE
+- **Lightweight**: Standalone binary, no dependencies required
+- **Easy Integration**: HTTP API for seamless integration with other tools
+
+---
+
 ## Quick Start (For Users)
 
 ### Download Pre-built Binary

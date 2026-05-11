@@ -8,6 +8,17 @@ AI 听写命令行工具 - 一个独立的转写引擎。
 
 ---
 
+## 特性
+
+- **多引擎支持**: 7 个 ASR 引擎 (SenseVoice, Whisper, Parakeet, Moonshine, GigaAM, Canary, Cohere)，16+ 个模型
+- **高性能**: 基于 Rust，支持 GPU 加速 (CUDA, DirectML, Vulkan, Metal)
+- **跨平台**: macOS (Intel + Apple Silicon)、Linux (x86_64 + ARM64)、Windows (x86_64 + ARM64)
+- **流式识别**: 支持实时流式转写 (SSE)
+- **轻量**: 独立二进制文件，无需额外依赖
+- **易于集成**: HTTP API，便于与其他工具集成
+
+---
+
 ## 快速开始（用户指南）
 
 ### 下载预编译版本
