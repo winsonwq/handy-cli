@@ -174,7 +174,7 @@ jobs:
           path: dist/*
 
   # Build for Windows ARM64 (Surface Pro 9, etc.)
-  # Note: Windows ARM64 requires Ninja + clang-cl (not MSVC)
+  # Note: Windows ARM64 requires Ninja + clang-cl + ARM64 LLVM (not x86)
   # Reference: Handy uses the same approach
   build-windows-arm64:
     runs-on: windows-11-arm
@@ -182,10 +182,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install LLVM and Ninja
+      - name: Download and install ARM64 LLVM
         shell: pwsh
         run: |
-          choco install llvm ninja --force
+          # Download ARM64 LLVM (not x86)
+          $llvmUrl = "https://github.com/llvm/llvm-project/releases/download/llvm-19.1.0/LLVM-19.1.0-ucrt-arm64.exe"
+          Write-Host "Downloading ARM64 LLVM from $llvmUrl"
+          Invoke-WebRequest -Uri $llvmUrl -OutFile "llvm-arm64.exe"
+
+          # Install silently
+          Start-Process -Wait -FilePath ".\llvm-arm64.exe" -ArgumentList "/S"
+
+          # Verify installation
+          & "C:\Program Files\LLVM\bin\clang-cl.exe" --version
+
+      - name: Install Ninja
+        run: choco install ninja --force
 
       - name: Enable LongPaths
         shell: pwsh
@@ -201,15 +213,18 @@ jobs:
           New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
           echo "CARGO_TARGET_DIR=$targetDir" >> $env:GITHUB_ENV
 
-      - name: Configure cmake for ARM64 with clang-cl
+      - name: Configure cmake and bindgen for ARM64 with clang-cl
         shell: pwsh
         run: |
+          $llvmBin = "C:\Program Files\LLVM\bin"
           echo "CMAKE_GENERATOR=Ninja" >> $env:GITHUB_ENV
           echo "CMAKE_C_COMPILER=clang-cl" >> $env:GITHUB_ENV
           echo "CMAKE_CXX_COMPILER=clang-cl" >> $env:GITHUB_ENV
           echo "CMAKE_C_COMPILER_TARGET=aarch64-pc-windows-msvc" >> $env:GITHUB_ENV
           echo "CMAKE_CXX_COMPILER_TARGET=aarch64-pc-windows-msvc" >> $env:GITHUB_ENV
           echo "CL=/EHsc" >> $env:GITHUB_ENV
+          # Point bindgen to ARM64 libclang
+          echo "LIBCLANG_PATH=$llvmBin" >> $env:GITHUB_ENV
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
