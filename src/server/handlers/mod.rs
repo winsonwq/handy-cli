@@ -451,8 +451,8 @@ pub struct StreamParams {
     pub translate: Option<bool>,
 }
 
-// Number of samples to accumulate before triggering partial transcription (~5 seconds at 16kHz)
-const PARTIAL_TRANSCRIBE_SAMPLES: usize = 80000;
+// Number of samples to accumulate before triggering partial transcription (~1 second at 16kHz)
+const PARTIAL_TRANSCRIBE_SAMPLES: usize = 16000;
 
 // Process streaming audio data - sends partial results as audio accumulates
 async fn process_streaming_audio(
