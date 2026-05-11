@@ -13,12 +13,14 @@ AI transcription CLI tool - A standalone transcription engine extracted from [Ha
 Download the latest release for your platform from the [GitHub Releases](https://github.com/cjpais/handy-cli/releases) page:
 
 | Platform | Architecture | Download |
-|----------|-------------|----------|
+| Platform | Architecture | Download |
+|:---------|:-------------|:---------|
 | macOS | Apple Silicon (M1/M2/M3) | `handy-cli-x.x.x-aarch64-apple-darwin.tar.gz` |
 | macOS | Intel | `handy-cli-x.x.x-x86_64-apple-darwin.tar.gz` |
 | Linux | x86_64 | `handy-cli-x.x.x-x86_64-unknown-linux-gnu.tar.gz` |
-| Windows | x86_64 | `handy-cli-x.x.x-x86_64-pc-windows-gnu.zip` |
-
+| Linux | ARM64 (aarch64) | `handy-cli-x.x.x-aarch64-unknown-linux-gnu.tar.gz` |
+| Windows | x86_64 | `handy-cli-x.x.x-x86_64-pc-windows-msvc.zip` |
+| Windows | ARM64 | `handy-cli-x.x.x-aarch64-pc-windows-msvc.zip` |
 ### Usage
 
 ```bash
@@ -102,14 +104,12 @@ brew install pkg-config openssl
 #### Ubuntu / Debian
 
 ```bash
-sudo apt install libssl-dev pkg-config
+sudo apt install libssl-dev pkg-config libasound2-dev
 ```
 
-#### Windows (with MSYS2)
+#### Windows
 
-```bash
-pacman -S mingw-w64-x86_64-openssl mingw-w64-x86_64-pkg-config
-```
+Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio) with the "Desktop development with C++" workload.
 
 ### Build
 
