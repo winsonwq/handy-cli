@@ -174,16 +174,30 @@ jobs:
           path: dist/*
 
   # Build for Windows ARM64 (Surface Pro 9, etc.)
+  # Note: Windows ARM64 requires Clang, not MSVC
   build-windows-arm64:
     runs-on: windows-11-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Clang
+        run: |
+          choco install llvm --force
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-pc-windows-msvc
+
+      - name: Set up environment for Clang
+        shell: pwsh
+        run: |
+          $clangPath = "C:\Program Files\LLVM\bin"
+          Add-Content -Path $env:GITHUB_ENV -Value "CC=clang-cl"
+          Add-Content -Path $env:GITHUB_ENV -Value "CXX=clang++"
+          Add-Content -Path $env:GITHUB_ENV -Value "LIBCLLIB_PATH=$clangPath"
+          $env:PATH = "$clangPath;$env:PATH"
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -198,7 +212,12 @@ jobs:
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build
-        run: cargo build --release --target aarch64-pc-windows-msvc
+        shell: pwsh
+        run: |
+          $env:CC = "clang-cl"
+          $env:CXX = "clang++"
+          $env:AR = "llvm-lib"
+          cargo build --release --target aarch64-pc-windows-msvc
 
       - name: Package
         shell: pwsh
