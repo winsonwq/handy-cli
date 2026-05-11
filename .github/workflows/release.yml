@@ -251,7 +251,8 @@ jobs:
         shell: pwsh
         run: |
           mkdir -p dist
-          Compress-Archive -Path t/aarch64-pc-windows-msvc/release/handy-cli.exe -DestinationPath dist/handy-cli-aarch64-pc-windows-msvc.zip
+          # CARGO_TARGET_DIR is C:\t, so output is at t\aarch64-pc-windows-msvc\release\
+          Compress-Archive -Path "C:\t\aarch64-pc-windows-msvc\release\handy-cli.exe" -DestinationPath dist/handy-cli-aarch64-pc-windows-msvc.zip
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
