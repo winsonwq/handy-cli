@@ -136,36 +136,15 @@ jobs:
           name: handy-cli-linux-x86_64
           path: dist/*
 
-  # Build for Linux aarch64 (cross-compile)
-  build-linux-aarch64:
-    runs-on: ubuntu-24.04
+  # Build for Windows (disable Vulkan to avoid compilation issues)
+  build-windows:
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-unknown-linux-gnu
-
-      - name: Install cross-compile dependencies
-        run: |
-          sudo apt-get update
-          # Enable ARM64 architecture and install cross-compile libraries
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc-aarch64-linux-gnu \
-            g++-aarch64-linux-gnu \
-            pkg-config \
-            libssl-dev:amd64 \
-            libssl-dev:arm64 \
-            libasound2-dev:arm64 \
-            libasound2-dev:amd64
-
-          # Create sysroot for cross-compilation
-          sudo mkdir -p /tmp/aarch64-sysroot/usr/lib/aarch64-linux-gnu
-          sudo cp -r /usr/aarch64-linux-gnu/* /tmp/aarch64-sysroot/usr/lib/aarch64-linux-gnu/ 2>/dev/null || true
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -181,108 +160,13 @@ jobs:
 
       - name: Build
         env:
-          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
-          CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
-          PKG_CONFIG_SYSROOT_DIR: /tmp/aarch64-sysroot
-          PKG_CONFIG_PATH: /tmp/aarch64-sysroot/usr/lib/aarch64-linux-gnu/pkgconfig:/tmp/aarch64-sysroot/usr/share/pkgconfig
-          OPENSSL_LIB_DIR: /tmp/aarch64-sysroot/usr/lib/aarch64-linux-gnu
-          OPENSSL_INCLUDE_DIR: /tmp/aarch64-sysroot/usr/include
-          OPENSSL_DIR: /tmp/aarch64-sysroot
-          BUILD_ALSA: false
-        run: cargo build --release --target aarch64-unknown-linux-gnu
-
-      - name: Package
-        run: |
-          mkdir -p dist
-          tar -czvf dist/handy-cli-aarch64-unknown-linux-gnu.tar.gz -C target/aarch64-unknown-linux-gnu/release handy-cli
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: handy-cli-linux-aarch64
-          path: dist/*
-
-  # Build for Windows
-  build-windows:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: pwsh
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Enable Long Paths
-        run: |
-          New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
-
-      - name: Install Vulkan SDK
-        run: |
-          choco install vulkan-sdk -y --force
-
-      - name: Verify Vulkan SDK installation
-        shell: bash
-        run: |
-          # Check common installation paths
-          echo "=== Checking Vulkan SDK installation ==="
-          for path in "/c/Program Files (x86)/VulkanSDK" "$PROGRAMFILES/VulkanSDK" "C:/VulkanSDK"; do
-            if [ -d "$path" ]; then
-              echo "Found: $path"
-              ls -la "$path"
-            fi
-          done
-
-      - name: Set Vulkan SDK path
-        shell: bash
-        run: |
-          # Find Vulkan SDK installed by choco
-          VULKAN_PATH=""
-          # Check multiple possible locations
-          for dir in "/c/Program Files (x86)/VulkanSDK" \
-                     "/c/Program Files/VulkanSDK" \
-                     "$PROGRAMFILES/VulkanSDK" \
-                     "$PROGRAMFILES(x86)/VulkanSDK" \
-                     "C:/VulkanSDK"; do
-            if [ -d "$dir" ]; then
-              echo "Checking: $dir"
-              # Get the latest version directory
-              latest=$(ls -td "$dir"/*/ 2>/dev/null | head -1)
-              if [ -n "$latest" ]; then
-                VULKAN_PATH="$latest"
-                break
-              fi
-            fi
-          done
-
-          if [ -n "$VULKAN_PATH" ]; then
-            echo "VULKAN_SDK=${VULKAN_PATH%/}" >> $GITHUB_ENV
-            echo "Found Vulkan SDK at: ${VULKAN_PATH%/}"
-            echo "Contents:"
-            ls -la "${VULKAN_PATH%/}"
-          else
-            echo "ERROR: Vulkan SDK not found"
-            exit 1
-          fi
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Build
+          # Disable Vulkan to avoid compilation issues on Windows
+          WHISPER_CPP_BUILD_VULKAN: "0"
+          CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS: "0"
         run: cargo build --release
 
       - name: Package
+        shell: pwsh
         run: |
           mkdir -p dist
           Compress-Archive -Path target/release/handy-cli.exe -DestinationPath dist/handy-cli-x86_64-pc-windows-msvc.zip
@@ -295,7 +179,7 @@ jobs:
 
   # Create release
   release:
-    needs: [build-macos-x86_64, build-macos-aarch64, build-linux-x86_64, build-linux-aarch64, build-windows]
+    needs: [build-macos-x86_64, build-macos-aarch64, build-linux-x86_64, build-windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
 
