@@ -185,8 +185,8 @@ jobs:
       - name: Download and install ARM64 LLVM
         shell: pwsh
         run: |
-          # Download ARM64 LLVM (not x86)
-          $llvmUrl = "https://github.com/llvm/llvm-project/releases/download/llvm-19.1.0/LLVM-19.1.0-ucrt-arm64.exe"
+          # Download ARM64 LLVM (woa64 = Windows on ARM64)
+          $llvmUrl = "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.0/LLVM-19.1.0-woa64.exe"
           Write-Host "Downloading ARM64 LLVM from $llvmUrl"
           Invoke-WebRequest -Uri $llvmUrl -OutFile "llvm-arm64.exe"
 
