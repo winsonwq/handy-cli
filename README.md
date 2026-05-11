@@ -1,6 +1,8 @@
 # handy-cli
 
-AI transcription CLI tool - A standalone transcription engine extracted from [Handy](https://github.com/cjpais/Handy).
+AI transcription CLI tool - A standalone transcription engine.
+
+This project was inspired by [Handy](https://github.com/cjpais/Handy), which impressed us with its excellent multi-engine architecture and thoughtful Rust-based design. We extracted the transcription engine to create a focused, standalone CLI tool for users who need a lightweight, efficient transcription solution.
 
 [中文文档 (Chinese)](docs/README_zh.md)
 

@@ -1,6 +1,8 @@
 # handy-cli
 
-AI 听写命令行工具 - 从 [Handy](https://github.com/cjpais/Handy) 提取的独立转写引擎。
+AI 听写命令行工具 - 一个独立的转写引擎。
+
+本项目受 [Handy](https://github.com/cjpais/Handy) 启发，欣赏其优秀的多引擎架构和精心设计的 Rust 实现。我们提取了转写引擎，创建了一个专注于轻量、高效的 CLI 工具。
 
 > **English**: 本文档为中文翻译，原版请查看 [../README.md](../README.md)
 
