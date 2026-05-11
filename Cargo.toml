@@ -58,7 +58,8 @@ sha2 = "0.10"
 base64 = "0.22"
 
 [target.'cfg(windows)'.dependencies]
-transcribe-rs = { version = "0.3.3", features = ["whisper-vulkan", "ort-directml"] }
+# Use ort-directml for GPU acceleration on Windows (no Vulkan required)
+transcribe-rs = { version = "0.3.3", features = ["ort-directml"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 transcribe-rs = { version = "0.3.3", features = ["whisper-metal"] }
