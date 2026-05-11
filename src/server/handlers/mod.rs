@@ -550,30 +550,59 @@ async fn process_streaming_audio(
         let audio_duration = audio_buffer.len() as f32 / 16000.0;
         tracing::info!("Transcribing accumulated audio: {} samples ({:.1}s)", audio_buffer.len(), audio_duration);
 
+        // Ensure transcriber is loaded
+        if let Err(e) = state.load_transcriber() {
+            tracing::error!("Failed to load transcriber: {}", e);
+            let _ = tx.send(SseEventData::Error {
+                message: format!("Failed to load transcriber: {}", e),
+            });
+            return Ok(());
+        }
+
         let _ = tx.send(SseEventData::Transcript {
             text: format!("Transcribing {:.1}s audio...", audio_duration),
             partial: true,
         });
 
         let samples = if sample_rate != 16000 {
-            resample_audio(&audio_buffer, sample_rate, 16000)
-                .map_err(|e| format!("Resample error: {:?}", e))?
+            match resample_audio(&audio_buffer, sample_rate, 16000) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!("Resample error: {}", e);
+                    let _ = tx.send(SseEventData::Error {
+                        message: format!("Resample error: {}", e),
+                    });
+                    return Ok(());
+                }
+            }
         } else {
             audio_buffer
         };
 
         let sample_count = samples.len();
-        tracing::info!("Transcribing with {} samples", sample_count);
+        let first_sample = samples.first().copied().unwrap_or(0.0);
+        let last_sample = samples.last().copied().unwrap_or(0.0);
+        tracing::info!("Calling transcribe with {} samples, range: [{}, {}]", sample_count, first_sample, last_sample);
 
-        match state.transcribe(&samples, language.as_deref(), translate) {
+        let result = state.transcribe(&samples, language.as_deref(), translate);
+        tracing::info!("Transcribe call completed, result: {:?}", result);
+
+        match result {
             Ok(result) => {
-                let _ = tx.send(SseEventData::Transcript {
-                    text: result.text,
+                tracing::info!("Transcription success: {} chars", result.text.len());
+                let event = SseEventData::Transcript {
+                    text: result.text.clone(),
                     partial: false,
-                });
+                };
+                if let Err(e) = tx.send(event) {
+                    tracing::error!("Failed to send final result: {}", e);
+                }
             }
             Err(e) => {
-                return Err(format!("Transcription error: {}", e));
+                tracing::error!("Transcription error: {}", e);
+                let _ = tx.send(SseEventData::Error {
+                    message: format!("Transcription error: {}", e),
+                });
             }
         }
     } else {
