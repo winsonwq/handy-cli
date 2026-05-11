@@ -151,7 +151,21 @@ jobs:
       - name: Install cross-compile dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu pkg-config libssl-dev libasound2-dev
+          # Enable ARM64 architecture and install cross-compile libraries
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            pkg-config \
+            libssl-dev:amd64 \
+            libssl-dev:arm64 \
+            libasound2-dev:arm64 \
+            libasound2-dev:amd64
+
+          # Create sysroot for cross-compilation
+          sudo mkdir -p /tmp/aarch64-sysroot/usr/lib/aarch64-linux-gnu
+          sudo cp -r /usr/aarch64-linux-gnu/* /tmp/aarch64-sysroot/usr/lib/aarch64-linux-gnu/ 2>/dev/null || true
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -169,6 +183,12 @@ jobs:
         env:
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
+          PKG_CONFIG_SYSROOT_DIR: /tmp/aarch64-sysroot
+          PKG_CONFIG_PATH: /tmp/aarch64-sysroot/usr/lib/aarch64-linux-gnu/pkgconfig:/tmp/aarch64-sysroot/usr/share/pkgconfig
+          OPENSSL_LIB_DIR: /tmp/aarch64-sysroot/usr/lib/aarch64-linux-gnu
+          OPENSSL_INCLUDE_DIR: /tmp/aarch64-sysroot/usr/include
+          OPENSSL_DIR: /tmp/aarch64-sysroot
+          BUILD_ALSA: false
         run: cargo build --release --target aarch64-unknown-linux-gnu
 
       - name: Package
@@ -185,9 +205,16 @@ jobs:
   # Build for Windows
   build-windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enable Long Paths
+        run: |
+          New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
 
       - name: Install Vulkan SDK
         run: |
