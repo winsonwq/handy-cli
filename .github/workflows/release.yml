@@ -173,6 +173,45 @@ jobs:
           name: handy-cli-windows
           path: dist/*
 
+  # Build for Windows ARM64 (Surface Pro 9, etc.)
+  build-windows-arm64:
+    runs-on: windows-11-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release --target aarch64-pc-windows-msvc
+
+      - name: Package
+        shell: pwsh
+        run: |
+          mkdir -p dist
+          Compress-Archive -Path target/aarch64-pc-windows-msvc/release/handy-cli.exe -DestinationPath dist/handy-cli-aarch64-pc-windows-msvc.zip
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: handy-cli-windows-arm64
+          path: dist/*
+
   # Build for Linux aarch64 (ARM64) using native ARM64 runner
   build-linux-aarch64:
     runs-on: ubuntu-24.04-arm
@@ -216,7 +255,7 @@ jobs:
 
   # Create release
   release:
-    needs: [build-macos-x86_64, build-macos-aarch64, build-linux-x86_64, build-linux-aarch64, build-windows]
+    needs: [build-macos-x86_64, build-macos-aarch64, build-linux-x86_64, build-linux-aarch64, build-windows, build-windows-arm64]
     runs-on: ubuntu-latest
     permissions:
       contents: write
