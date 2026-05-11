@@ -34,10 +34,7 @@ pub fn create_app(
         .route("/api/models", get(list_models))
         .route("/api/models/downloaded", get(list_downloaded_models))
         // Transcription endpoints with increased body limit
-        .route(
-            "/api/transcribe",
-            post(transcribe).layer(body_limit),
-        )
+        .route("/api/transcribe", post(transcribe).layer(body_limit))
         .route(
             "/api/transcribe/stream",
             post(transcribe_stream).layer(body_limit),
