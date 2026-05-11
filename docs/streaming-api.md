@@ -8,6 +8,15 @@ The streaming transcription API (`POST /api/transcribe/stream`) provides real-ti
 2. **Triggers transcription incrementally** - partial results are sent as soon as enough audio is accumulated
 3. **Returns final result** - when all audio data has been received
 
+## Architecture Note
+
+> **This is a generic server-side streaming algorithm**, independent of the underlying ASR engine.
+>
+> It works with **any transcription engine** (Whisper, SenseVoice, Parakeet, etc.) because:
+> - The algorithm only requires the engine's batch transcription capability
+> - No model-specific streaming implementation is needed
+> - Each partial transcription re-transcribes the accumulated audio from scratch
+
 ## Algorithm
 
 ```
@@ -211,6 +220,6 @@ for line in response.iter_lines():
 ## Future Improvements
 
 - [ ] WebSocket support for bidirectional communication
-- [ ] Moonshine streaming model for true incremental transcription
+- [ ] Native model streaming (e.g., Moonshine streaming model) - for true incremental transcription without re-transcribing accumulated audio
 - [ ] Sliding window for memory-efficient processing of long recordings
 - [ ] Audio format auto-detection (currently expects 16-bit PCM)
